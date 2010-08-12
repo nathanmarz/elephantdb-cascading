@@ -6,6 +6,7 @@
   (:import [cascading.tap Hfs])
   (:import [elephantdb.persistence JavaBerkDB LocalPersistenceFactory])
   (:import [elephantdb DomainSpec])
+  (:import [elephantdb.hadoop ReplaceUpdater])
   (:import [elephantdb.cascading ElephantDBTap ElephantDBTap$Args ElephantTailAssembly])
   (:import [org.apache.hadoop.io BytesWritable IntWritable])
   (:import [org.apache.hadoop.mapred JobConf])
@@ -61,8 +62,23 @@
     (check-results tmp data)
     (emit-to-sink sink data2)
     (check-results tmp (conj data2 [(barr 1) nil]))
-    ;; emit again with different data, check that it doesn't update
     ))
 
 (deffstest test-incremental [fs tmp]
-  )
+  (let [spec (DomainSpec. (JavaBerkDB.) 2)
+        sink (ElephantDBTap. tmp spec (mk-options (ReplaceUpdater.)))
+        data [[(barr 0) (barr 0 0)]
+              [(barr 1) (barr 1 1)]
+              [(barr 2) (barr 2 2)]
+              ]
+        data2 [[(barr 0) (barr 1)]
+               [(barr 3) (barr 3)]]
+        data3 [[(barr 0) (barr 1)]
+               [(barr 1) (barr 1 1)]
+               [(barr 2) (barr 2 2)]
+               [(barr 3) (barr 3)]]]
+    (emit-to-sink sink data)
+    (check-results tmp data)
+    (emit-to-sink sink data2)
+    (check-results tmp data3)
+    ))

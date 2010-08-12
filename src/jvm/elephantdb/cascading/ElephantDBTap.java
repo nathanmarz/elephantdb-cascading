@@ -115,7 +115,6 @@ public class ElephantDBTap extends SinkTap implements FlowListener {
 
     @Override
     public void sinkInit(JobConf conf) throws IOException {
-        System.out.println("initing sink");
         DomainStore dstore = getDomainStore();
         if(_newVersionPath==null) { //working around cascading calling sinkinit twice
             _newVersionPath = dstore.createVersion();
