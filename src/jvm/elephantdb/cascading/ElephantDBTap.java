@@ -16,6 +16,7 @@ import elephantdb.Utils;
 import elephantdb.hadoop.ElephantOutputFormat;
 import elephantdb.hadoop.ElephantRecordWritable;
 import elephantdb.hadoop.ElephantUpdater;
+import elephantdb.hadoop.ReplaceUpdater;
 import elephantdb.store.DomainStore;
 import java.io.IOException;
 import java.io.Serializable;
@@ -47,13 +48,13 @@ public class ElephantDBTap extends SinkTap implements FlowListener {
         @Override
         public void sink(TupleEntry te, OutputCollector oc) throws IOException {
             throw new UnsupportedOperationException("Not supported yet.");
-        }        
+        }
     }
 
     public static class Args implements Serializable {
         public Map<String, Map<String, Object>> persistenceOptions = null;
         public List<String> tmpDirs = null;
-        public ElephantUpdater updater = null;
+        public ElephantUpdater updater = new ReplaceUpdater(); //set this to null to prevent updating
         public Fields fields = Fields.ALL;
         public int timeoutMs = 2*60*60*1000; // 2 hours
     }
@@ -184,7 +185,7 @@ public class ElephantDBTap extends SinkTap implements FlowListener {
         } catch(IOException e) {
             throw new TapException("Couldn't finalize new elephant domain version", e);
         } finally {
-            _newVersionPath = null;
+            _newVersionPath = null; //working around cascading calling sinkinit twice
         }
     }
 
@@ -196,7 +197,4 @@ public class ElephantDBTap extends SinkTap implements FlowListener {
     public TupleEntryCollector openForWrite(JobConf conf) throws IOException {
         return new TapCollector(this, conf);
     }
-
-
-
 }

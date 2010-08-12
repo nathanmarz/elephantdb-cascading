@@ -54,9 +54,14 @@
               [(barr 6) (barr 6 5)]
               [(barr 7) (barr 7 5)]
               [(barr 8) (barr 8 5)]
-              ]]
+              ]
+        data2 [[(barr 0) (barr 1)
+                (barr 10) (barr 100)]]]
     (emit-to-sink sink data)
     (check-results tmp data)
+    (emit-to-sink sink data2)
+    (check-results tmp (conj data2 [(barr 1) nil]))
+    ;; emit again with different data, check that it doesn't update
     ))
 
 (deffstest test-incremental [fs tmp]
