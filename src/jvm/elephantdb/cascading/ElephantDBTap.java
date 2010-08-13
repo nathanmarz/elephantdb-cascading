@@ -23,6 +23,7 @@ import java.io.Serializable;
 import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.OutputCollector;
@@ -105,9 +106,8 @@ public class ElephantDBTap extends SinkTap implements FlowListener {
     public void sink(TupleEntry tupleEntry, OutputCollector outputCollector) throws IOException {
         int bucket = tupleEntry.getInteger(0);
         Object key = tupleEntry.get(1);
-        Object value = tupleEntry.get(2);
         byte[] keybytes = Common.serializeElephantVal(key);
-        byte[] valuebytes = Common.serializeElephantVal(value);
+        byte[] valuebytes = Common.getBytes((BytesWritable)tupleEntry.get(2));
 
         ElephantRecordWritable record = new ElephantRecordWritable(keybytes, valuebytes);
         outputCollector.collect(new IntWritable(bucket), record);
