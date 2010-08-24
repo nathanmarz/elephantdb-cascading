@@ -53,7 +53,7 @@ public class ElephantDBTap extends SinkTap implements FlowListener {
     }
 
     public static class Args implements Serializable {
-        public Map<String, Map<String, Object>> persistenceOptions = null;
+        public Map<String, Object> persistenceOptions = null;
         public List<String> tmpDirs = null;
         public ElephantUpdater updater = new ReplaceUpdater(); //set this to null to prevent updating
         public Fields fields = Fields.ALL;
@@ -104,13 +104,13 @@ public class ElephantDBTap extends SinkTap implements FlowListener {
 
     @Override
     public void sink(TupleEntry tupleEntry, OutputCollector outputCollector) throws IOException {
-        int bucket = tupleEntry.getInteger(0);
+        int shard = tupleEntry.getInteger(0);
         Object key = tupleEntry.get(1);
         byte[] keybytes = Common.serializeElephantVal(key);
         byte[] valuebytes = Common.getBytes((BytesWritable)tupleEntry.get(2));
 
         ElephantRecordWritable record = new ElephantRecordWritable(keybytes, valuebytes);
-        outputCollector.collect(new IntWritable(bucket), record);
+        outputCollector.collect(new IntWritable(shard), record);
     }
 
     @Override
