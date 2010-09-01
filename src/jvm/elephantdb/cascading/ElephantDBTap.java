@@ -174,6 +174,7 @@ public class ElephantDBTap extends SinkTap implements FlowListener {
         try {
             DomainStore dstore = getDomainStore();
             if(flow.getFlowStats().isSuccessful()) {
+                dstore.getFileSystem().mkdirs(new Path(_newVersionPath));
                 if(_args.updater!=null) {
                     dstore.synchronizeInProgressVersion(_newVersionPath);
                 }
