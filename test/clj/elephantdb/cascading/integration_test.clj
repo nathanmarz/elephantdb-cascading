@@ -1,11 +1,12 @@
 (ns elephantdb.cascading.integration-test
   (:import [cascading.operation Identity])
   (:import [cascading.pipe Each GroupBy Pipe SubAssembly])
+  (:import [cascading.operation Debug])
   (:import [cascading.tuple Fields Tuple TupleEntry])
   (:import [cascading.flow FlowConnector])
   (:import [cascading.tap Hfs])
   (:import [elephantdb.persistence JavaBerkDB LocalPersistenceFactory])
-  (:import [elephantdb DomainSpec])
+  (:import [elephantdb DomainSpec Utils])
   (:import [elephantdb.hadoop ReplaceUpdater])
   (:import [elephantdb.cascading ElephantDBTap ElephantDBTap$Args ElephantTailAssembly])
   (:import [org.apache.hadoop.io BytesWritable IntWritable])
@@ -82,3 +83,41 @@
     (emit-to-sink sink data2)
     (check-results tmp data3)
     ))
+
+(defn get-tuples [sink]
+  (with-open [it (.openForRead sink (JobConf.))]
+    (doall
+     (map
+      #(vec (seq (.getTuple %)))
+      (iterator-seq it)))))
+
+(defn read-etap-with-flow [path]
+  (with-fs-tmp [fs tmp]
+    (let [source (ElephantDBTap. path)
+          sink (Hfs. (Fields. (into-array ["key" "value"])) tmp)
+          p (Pipe. "flow")
+          flow (.connect (FlowConnector.) source sink p)]
+      (.complete flow)
+      (for [[k v] (get-tuples sink)]
+        [(Utils/getBytes k) (Utils/getBytes v)]
+        ))))
+
+(deffstest test-source [fs tmp]
+  (let [pairs [[(barr 0) (barr 0 2)]
+               [(barr 1) (barr 1 1)]
+               [(barr 2) (barr 9 1)]
+               [(barr 33) (barr 0 2 3)]
+               [(barr 4) (barr 0)]
+               [(barr 5) (barr 1)]
+               [(barr 6) (barr 3)]
+               [(barr 7) (barr 9 101 9 9)]
+               [(barr 81) (barr 9 9 9 1)]
+               [(barr 9) (barr 9 9 2)]
+               [(barr 102) (barr 3 6)]
+               ]]
+    (with-sharded-domain [dpath
+                          {:num-shards 6
+                           :persistence-factory (JavaBerkDB.)}
+                          pairs]
+      (is (kv-pairs= pairs (read-etap-with-flow dpath)))
+      )))
