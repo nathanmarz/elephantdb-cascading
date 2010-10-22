@@ -95,6 +95,7 @@ public class ElephantDBTap extends Tap implements FlowListener {
         _domainDir = dir;
         _spec = new DomainStore(dir, spec).getSpec();
         _args = args;
+        _id = globalid++;
     }
 
     private DomainStore getDomainStore() throws IOException {
@@ -251,5 +252,22 @@ public class ElephantDBTap extends Tap implements FlowListener {
     public TupleEntryIterator openForRead(JobConf conf) throws IOException {
         return new TupleEntryIterator(getSourceFields(), new TapIterator(this, conf));
     }
+
+    @Override
+    public boolean equals(Object object) {
+        if(object instanceof ElephantDBTap) {
+            return _id == ((ElephantDBTap) object)._id;
+        } else {
+            return false;
+        }
+    }
+
+    @Override
+    public int hashCode() {
+        return new Integer(_id).hashCode();
+    }
+
+    private int _id;
+    private static int globalid = 0;
 
 }
