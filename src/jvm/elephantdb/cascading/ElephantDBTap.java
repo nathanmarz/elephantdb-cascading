@@ -60,7 +60,6 @@ public class ElephantDBTap extends Tap implements FlowListener {
     public static class Args implements Serializable {
         //for source and sink
         public Map<String, Object> persistenceOptions = null;
-        public List<String> tmpDirs = null;
         public int timeoutMs = 2*60*60*1000; // 2 hours
 
         //source specific
@@ -134,8 +133,6 @@ public class ElephantDBTap extends Tap implements FlowListener {
         eargs.inputDirHdfs = _domainDir;
         if(_args.persistenceOptions!=null)
             eargs.persistenceOptions = _args.persistenceOptions;
-        if(_args.tmpDirs!=null)
-            eargs.tmpDirs = _args.tmpDirs;
         eargs.version = _args.version;
 
         conf.setInt("mapred.task.timeout", _args.timeoutMs);
@@ -163,9 +160,6 @@ public class ElephantDBTap extends Tap implements FlowListener {
         ElephantOutputFormat.Args eargs = new ElephantOutputFormat.Args(_spec, _newVersionPath);
         if(_args.persistenceOptions!=null) {
             eargs.persistenceOptions = _args.persistenceOptions;
-        }
-        if(_args.tmpDirs!=null) {
-            eargs.tmpDirs = _args.tmpDirs;
         }
         if(_args.updater!=null) {
             eargs.updater = _args.updater;
