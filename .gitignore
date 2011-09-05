@@ -3,3 +3,6 @@ CHILD
 CHILDMAKER
 _deps
 classes
+lib
+pom.xml
+*.jar
