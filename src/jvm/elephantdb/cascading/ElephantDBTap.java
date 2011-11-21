@@ -10,6 +10,8 @@ import cascading.tap.hadoop.TapIterator;
 import cascading.tuple.*;
 import elephantdb.DomainSpec;
 import elephantdb.Utils;
+
+import elephantdb.hadoop.Deserializer;
 import elephantdb.hadoop.*;
 import elephantdb.store.DomainStore;
 import org.apache.hadoop.fs.Path;
@@ -117,6 +119,7 @@ public class ElephantDBTap extends Tap implements FlowListener {
 
     @Override
     public Tuple source(Object key, Object value) {
+        // IS THIS the way for us? Do we want to deserialize both?
         key = _args.deserializer == null ? key : _args.deserializer.deserialize((BytesWritable) key);
         return new Tuple(key, value);
     }
@@ -144,6 +147,9 @@ public class ElephantDBTap extends Tap implements FlowListener {
     public void sink(TupleEntry tupleEntry, OutputCollector outputCollector) throws IOException {
         int shard = tupleEntry.getInteger(0);
         Object key = tupleEntry.get(1);
+
+        // TODO: Need a better way of serializing than this.
+        // Tap should take a serialization format as an option.
         byte[] keybytes = Common.serializeElephantVal(key);
         byte[] valuebytes = Common.getBytes((BytesWritable) tupleEntry.get(2));
 
@@ -168,6 +174,8 @@ public class ElephantDBTap extends Tap implements FlowListener {
             eargs.updater = _args.updater;
             eargs.updateDirHdfs = dstore.mostRecentVersionPath();
         }
+
+        // serialize this particular argument off into the JobConf.
         Utils.setObject(conf, ElephantOutputFormat.ARGS_CONF, eargs);
         conf.setInt("mapred.task.timeout", _args.timeoutMs);
         conf.setBoolean("mapred.reduce.tasks.speculative.execution", false);

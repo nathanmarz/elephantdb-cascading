@@ -63,9 +63,11 @@ public class ElephantTailAssembly extends SubAssembly {
         LocalPersistenceFactory lp = outTap.getSpec().getLPFactory();
         out = new Each(out, new Fields(0), new MakeSortableKey(keysortfield, lp), Fields.ALL);
 
-        //put in order of shard, key, value
+        //put in order of shard, key, value, sortablekey
         out = new Each(out, new Fields(2, 0, 1, 3), new Identity(), Fields.RESULTS);
         out = new GroupBy(out, new Fields(0), new Fields(3)); // group by shard
+
+        // emit shard, key, value
         out = new Each(out, new Fields(0, 1, 2), new Identity());
         setTails(out);
     }
