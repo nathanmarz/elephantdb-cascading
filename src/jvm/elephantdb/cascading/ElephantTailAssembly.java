@@ -2,7 +2,6 @@ package elephantdb.cascading;
 
 import cascading.flow.FlowProcess;
 import cascading.operation.BaseOperation;
-import cascading.operation.Debug;
 import cascading.operation.Function;
 import cascading.operation.FunctionCall;
 import cascading.operation.Identity;
@@ -13,6 +12,7 @@ import cascading.pipe.SubAssembly;
 import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
 import elephantdb.Utils;
+import elephantdb.hadoop.Common;
 import elephantdb.persistence.LocalPersistenceFactory;
 import java.util.UUID;
 import org.apache.hadoop.io.BytesWritable;
@@ -51,13 +51,21 @@ public class ElephantTailAssembly extends SubAssembly {
     }
 
     public ElephantTailAssembly(Pipe keyValuePairs, ElephantDBTap outTap) {
+
+        // generate two random field names
         String shardfield = "shard" + UUID.randomUUID().toString();
         String keysortfield = "keysort" + UUID.randomUUID().toString();
-        Pipe out = new Each(keyValuePairs, new Fields(0), new Shardize(shardfield, outTap.getSpec().getNumShards()), Fields.ALL);
-        out = new Each(out, new Fields(0), new MakeSortableKey(keysortfield, outTap.getSpec().getLPFactory()), Fields.ALL);
+
+        int numShards = outTap.getSpec().getNumShards();
+        // shardize the key.
+        Pipe out = new Each(keyValuePairs, new Fields(0), new Shardize(shardfield, numShards), Fields.ALL);
+
+        LocalPersistenceFactory lp = outTap.getSpec().getLPFactory();
+        out = new Each(out, new Fields(0), new MakeSortableKey(keysortfield, lp), Fields.ALL);
+
         //put in order of shard, key, value
         out = new Each(out, new Fields(2, 0, 1, 3), new Identity(), Fields.RESULTS);
-        out = new GroupBy(out, new Fields(0), new Fields(3));
+        out = new GroupBy(out, new Fields(0), new Fields(3)); // group by shard
         out = new Each(out, new Fields(0, 1, 2), new Identity());
         setTails(out);
     }

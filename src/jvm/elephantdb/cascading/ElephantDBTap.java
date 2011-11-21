@@ -7,32 +7,24 @@ import cascading.tap.Tap;
 import cascading.tap.TapException;
 import cascading.tap.hadoop.TapCollector;
 import cascading.tap.hadoop.TapIterator;
-import cascading.tuple.Fields;
-import cascading.tuple.Tuple;
-import cascading.tuple.TupleEntry;
-import cascading.tuple.TupleEntryCollector;
-import cascading.tuple.TupleEntryIterator;
+import cascading.tuple.*;
 import elephantdb.DomainSpec;
 import elephantdb.Utils;
-import elephantdb.hadoop.ElephantInputFormat;
-import elephantdb.hadoop.ElephantOutputFormat;
-import elephantdb.hadoop.ElephantRecordWritable;
-import elephantdb.hadoop.ElephantUpdater;
-import elephantdb.hadoop.LocalElephantManager;
-import elephantdb.hadoop.ReplaceUpdater;
+import elephantdb.hadoop.*;
 import elephantdb.store.DomainStore;
-import java.io.IOException;
-import java.io.Serializable;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.UUID;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.mapred.FileInputFormat;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.OutputCollector;
+
+import java.io.IOException;
+import java.io.Serializable;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.UUID;
 
 
 public class ElephantDBTap extends Tap implements FlowListener {
@@ -62,7 +54,7 @@ public class ElephantDBTap extends Tap implements FlowListener {
         //for source and sink
         public Map<String, Object> persistenceOptions = null;
         public List<String> tmpDirs = null;
-        public int timeoutMs = 2*60*60*1000; // 2 hours
+        public int timeoutMs = 2 * 60 * 60 * 1000; // 2 hours
 
         //source specific
         public Fields sourceFields = new Fields("key", "value");
@@ -71,7 +63,8 @@ public class ElephantDBTap extends Tap implements FlowListener {
 
         //sink specific
         public Fields sinkFields = Fields.ALL;
-        public ElephantUpdater updater = new ReplaceUpdater(); //set this to null to prevent updating
+        public ElephantUpdater updater = new ReplaceUpdater();
+            //set this to null to prevent updating
     }
 
     String _domainDir;
@@ -130,13 +123,16 @@ public class ElephantDBTap extends Tap implements FlowListener {
 
     @Override
     public void sourceInit(JobConf conf) throws IOException {
-        FileInputFormat.setInputPaths( conf, "/" + UUID.randomUUID().toString());
+
+        // Why do we use this random string?
+        FileInputFormat.setInputPaths(conf, "/" + UUID.randomUUID().toString());
+
         ElephantInputFormat.Args eargs = new ElephantInputFormat.Args(_domainDir);
         eargs.inputDirHdfs = _domainDir;
-        if(_args.persistenceOptions!=null)
+        if (_args.persistenceOptions != null) {
             eargs.persistenceOptions = _args.persistenceOptions;
-        if(_args.tmpDirs!=null)
-            LocalElephantManager.setTmpDirs(conf, _args.tmpDirs);
+        }
+        if (_args.tmpDirs != null) { LocalElephantManager.setTmpDirs(conf, _args.tmpDirs); }
         eargs.version = _args.version;
 
         conf.setInt("mapred.task.timeout", _args.timeoutMs);
@@ -149,7 +145,7 @@ public class ElephantDBTap extends Tap implements FlowListener {
         int shard = tupleEntry.getInteger(0);
         Object key = tupleEntry.get(1);
         byte[] keybytes = Common.serializeElephantVal(key);
-        byte[] valuebytes = Common.getBytes((BytesWritable)tupleEntry.get(2));
+        byte[] valuebytes = Common.getBytes((BytesWritable) tupleEntry.get(2));
 
         ElephantRecordWritable record = new ElephantRecordWritable(keybytes, valuebytes);
         outputCollector.collect(new IntWritable(shard), record);
@@ -158,17 +154,17 @@ public class ElephantDBTap extends Tap implements FlowListener {
     @Override
     public void sinkInit(JobConf conf) throws IOException {
         DomainStore dstore = getDomainStore();
-        if(_newVersionPath==null) { //working around cascading calling sinkinit twice
+        if (_newVersionPath == null) { //working around cascading calling sinkinit twice
             _newVersionPath = dstore.createVersion();
         }
         ElephantOutputFormat.Args eargs = new ElephantOutputFormat.Args(_spec, _newVersionPath);
-        if(_args.persistenceOptions!=null) {
+        if (_args.persistenceOptions != null) {
             eargs.persistenceOptions = _args.persistenceOptions;
         }
-        if(_args.tmpDirs!=null) {
+        if (_args.tmpDirs != null) {
             LocalElephantManager.setTmpDirs(conf, _args.tmpDirs);
         }
-        if(_args.updater!=null) {
+        if (_args.updater != null) {
             eargs.updater = _args.updater;
             eargs.updateDirHdfs = dstore.mostRecentVersionPath();
         }
@@ -213,19 +209,19 @@ public class ElephantDBTap extends Tap implements FlowListener {
     }
 
     private boolean isSinkOf(Flow flow) {
-        for(Entry<String, Tap> e: flow.getSinks().entrySet()) {
-            if(e.getValue()==this) return true;
+        for (Entry<String, Tap> e : flow.getSinks().entrySet()) {
+            if (e.getValue() == this) { return true; }
         }
         return false;
     }
 
     public void onCompleted(Flow flow) {
         try {
-            if(isSinkOf(flow)) {
+            if (isSinkOf(flow)) {
                 DomainStore dstore = getDomainStore();
-                if(flow.getFlowStats().isSuccessful()) {
+                if (flow.getFlowStats().isSuccessful()) {
                     dstore.getFileSystem().mkdirs(new Path(_newVersionPath));
-                    if(_args.updater!=null) {
+                    if (_args.updater != null) {
                         dstore.synchronizeInProgressVersion(_newVersionPath);
                     }
                     dstore.succeedVersion(_newVersionPath);
@@ -233,7 +229,7 @@ public class ElephantDBTap extends Tap implements FlowListener {
                     dstore.failVersion(_newVersionPath);
                 }
             }
-        } catch(IOException e) {
+        } catch (IOException e) {
             throw new TapException("Couldn't finalize new elephant domain version", e);
         } finally {
             _newVersionPath = null; //working around cascading calling sinkinit twice
@@ -256,7 +252,7 @@ public class ElephantDBTap extends Tap implements FlowListener {
 
     @Override
     public boolean equals(Object object) {
-        if(object instanceof ElephantDBTap) {
+        if (object instanceof ElephantDBTap) {
             return _id == ((ElephantDBTap) object)._id;
         } else {
             return false;
