@@ -10,9 +10,9 @@ import cascading.tap.hadoop.TapIterator;
 import cascading.tuple.*;
 import elephantdb.DomainSpec;
 import elephantdb.Utils;
-
-import elephantdb.hadoop.Deserializer;
 import elephantdb.hadoop.*;
+import elephantdb.persistence.LocalPersistenceFactory;
+import elephantdb.persistence.Transmitter;
 import elephantdb.store.DomainStore;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.BytesWritable;
@@ -20,6 +20,7 @@ import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.mapred.FileInputFormat;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.OutputCollector;
+import sun.plugin2.message.Serializer;
 
 import java.io.IOException;
 import java.io.Serializable;
@@ -62,15 +63,17 @@ public class ElephantDBTap extends Tap implements FlowListener {
         public Fields sourceFields = new Fields("key", "value");
         public Long version = null; //for sourcing
         public Deserializer deserializer = null;
+        public Serializer serializer = null;
 
         //sink specific
         public Fields sinkFields = Fields.ALL;
         public ElephantUpdater updater = new ReplaceUpdater();
-            //set this to null to prevent updating
+        //set this to null to prevent updating
     }
 
     String _domainDir;
     DomainSpec _spec;
+    LocalPersistenceFactory _fact;
     Args _args;
     String _newVersionPath;
 
@@ -90,6 +93,8 @@ public class ElephantDBTap extends Tap implements FlowListener {
         super(new ElephantScheme());
         _domainDir = dir;
         _spec = new DomainStore(dir, spec).getSpec();
+        _fact = _spec.getLPFactory();
+
         _args = args;
         _id = globalid++;
     }
@@ -120,7 +125,10 @@ public class ElephantDBTap extends Tap implements FlowListener {
     @Override
     public Tuple source(Object key, Object value) {
         // IS THIS the way for us? Do we want to deserialize both?
-        key = _args.deserializer == null ? key : _args.deserializer.deserialize((BytesWritable) key);
+        // These result from the InputFormat's next method. Both are BytesWritable.
+
+        key = (_args.deserializer == null) ? key :
+            _args.deserializer.deserialize((BytesWritable) key);
         return new Tuple(key, value);
     }
 
@@ -143,22 +151,25 @@ public class ElephantDBTap extends Tap implements FlowListener {
         conf.setInputFormat(ElephantInputFormat.class);
     }
 
-    @Override
-    public void sink(TupleEntry tupleEntry, OutputCollector outputCollector) throws IOException {
+
+    // This is generic, this is good stuff.
+    @Override public void sink(TupleEntry tupleEntry, OutputCollector outputCollector)
+        throws IOException {
         int shard = tupleEntry.getInteger(0);
         Object key = tupleEntry.get(1);
+        BytesWritable val = (BytesWritable) tupleEntry.get(2);
 
         // TODO: Need a better way of serializing than this.
-        // Tap should take a serialization format as an option.
-        byte[] keybytes = Common.serializeElephantVal(key);
-        byte[] valuebytes = Common.getBytes((BytesWritable) tupleEntry.get(2));
+        // This should happen from an interface; take the objects, generate BytesWritable objects.
+        Transmitter trans = _fact.getTransmitter();
+        byte[] keybytes = trans.serializeKey(key);
+        byte[] valuebytes = trans.serializeVal(val);
 
         ElephantRecordWritable record = new ElephantRecordWritable(keybytes, valuebytes);
         outputCollector.collect(new IntWritable(shard), record);
     }
 
-    @Override
-    public void sinkInit(JobConf conf) throws IOException {
+    public ElephantOutputFormat.Args outputArgs(JobConf conf) throws IOException {
         DomainStore dstore = getDomainStore();
         if (_newVersionPath == null) { //working around cascading calling sinkinit twice
             _newVersionPath = dstore.createVersion();
@@ -175,8 +186,16 @@ public class ElephantDBTap extends Tap implements FlowListener {
             eargs.updateDirHdfs = dstore.mostRecentVersionPath();
         }
 
+        return eargs;
+    }
+
+    @Override
+    public void sinkInit(JobConf conf) throws IOException {
+
+        ElephantOutputFormat.Args args = outputArgs(conf);
+
         // serialize this particular argument off into the JobConf.
-        Utils.setObject(conf, ElephantOutputFormat.ARGS_CONF, eargs);
+        Utils.setObject(conf, ElephantOutputFormat.ARGS_CONF, args);
         conf.setInt("mapred.task.timeout", _args.timeoutMs);
         conf.setBoolean("mapred.reduce.tasks.speculative.execution", false);
         conf.setInt("mapred.reduce.tasks", _spec.getNumShards());

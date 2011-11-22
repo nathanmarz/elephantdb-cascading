@@ -11,26 +11,30 @@ import cascading.pipe.Pipe;
 import cascading.pipe.SubAssembly;
 import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
-import elephantdb.Utils;
-import elephantdb.hadoop.Common;
 import elephantdb.persistence.LocalPersistenceFactory;
-import java.util.UUID;
 import org.apache.hadoop.io.BytesWritable;
+
+import java.util.UUID;
 
 
 public class ElephantTailAssembly extends SubAssembly {
     public static class Shardize extends BaseOperation implements Function {
         int _numShards;
+        LocalPersistenceFactory _fact;
 
-        public Shardize(String outfield, int numShards) {
+        // Pass in an object that implements the KeySharder interface.
+        public Shardize(String outfield, int numShards, LocalPersistenceFactory fact) {
             super(new Fields(outfield));
+            _fact = fact;
             _numShards = numShards;
         }
 
         public void operate(FlowProcess process, FunctionCall call) {
             Object key = call.getArguments().get(0);
-            byte[] serkey = Common.serializeElephantVal(key);
-            int shard = Utils.keyShard(serkey, _numShards);
+            Object val = call.getArguments().get(1);
+
+            byte[] serkey = _fact.getTransmitter().serializeKey(key);
+            int shard = _fact.getSharder().shardIndex(_numShards, key, val);
             call.getOutputCollector().add(new Tuple(shard));
         }
     }
@@ -44,8 +48,10 @@ public class ElephantTailAssembly extends SubAssembly {
         }
 
         public void operate(FlowProcess process, FunctionCall call) {
-            byte[] serkey = Common.serializeElephantVal(call.getArguments().get(0));
+            Object key = call.getArguments().get(0);
+            byte[] serkey = _fact.getTransmitter().serializeKey(key);
             byte[] sortkey = _fact.getKeySorter().getSortableKey(serkey);
+
             call.getOutputCollector().add(new Tuple(new BytesWritable(sortkey)));
         }
     }
@@ -56,11 +62,10 @@ public class ElephantTailAssembly extends SubAssembly {
         String shardfield = "shard" + UUID.randomUUID().toString();
         String keysortfield = "keysort" + UUID.randomUUID().toString();
 
+        LocalPersistenceFactory lp = outTap.getSpec().getLPFactory();
         int numShards = outTap.getSpec().getNumShards();
         // shardize the key.
-        Pipe out = new Each(keyValuePairs, new Fields(0), new Shardize(shardfield, numShards), Fields.ALL);
-
-        LocalPersistenceFactory lp = outTap.getSpec().getLPFactory();
+        Pipe out = new Each(keyValuePairs, new Fields(0), new Shardize(shardfield, numShards, lp), Fields.ALL);
         out = new Each(out, new Fields(0), new MakeSortableKey(keysortfield, lp), Fields.ALL);
 
         //put in order of shard, key, value, sortablekey
