@@ -11,32 +11,36 @@ import org.apache.hadoop.mapred.OutputCollector;
 
 import java.io.IOException;
 
+/** User: sritchie Date: 11/22/11 Time: 5:58 PM */
+public class EDBSearchTap extends ElephantBaseTap {
 
-public class ElephantDBTap extends ElephantBaseTap {
-
-    public ElephantDBTap(String dir, Args args) throws IOException {
+    // TODO: What constructors make sense? Check wonderdog.
+    public EDBSearchTap(String dir, Args args) throws IOException {
         this(dir, null, args);
     }
 
-    public ElephantDBTap(String dir) throws IOException {
+    public EDBSearchTap(String dir) throws IOException {
         this(dir, null, new Args());
     }
 
-    public ElephantDBTap(String dir, DomainSpec spec) throws IOException {
+    public EDBSearchTap(String dir, DomainSpec spec) throws IOException {
         this(dir, spec, new Args());
     }
 
-    public ElephantDBTap(String dir, DomainSpec spec, Args args) throws IOException {
+    public EDBSearchTap(String dir, DomainSpec spec, Args args) throws IOException {
         super(dir, spec, args);
     }
 
+    // Obviously needs to change for search.
     @Override public Tuple source(Object key, Object value) {
         key = (_args.deserializer == null) ? key :
             _args.deserializer.deserialize((BytesWritable) key);
         return new Tuple(key, value);
     }
 
-    // This is generic between implementations.
+    // Generic! Serialization's implemented with the transmitter.
+    // Can take any object, at this point.
+    // TODO: Remove this from here and ElephantDBTap.
     @Override public void sink(TupleEntry tupleEntry, OutputCollector outputCollector)
         throws IOException {
         int shard = tupleEntry.getInteger(0);
@@ -54,11 +58,12 @@ public class ElephantDBTap extends ElephantBaseTap {
     // TODO: Implement hashcode and equals in the superclass.
     @Override public int hashCode() {
         return new Integer(_id).hashCode();
+
     }
 
     @Override public boolean equals(Object object) {
-        if (object instanceof ElephantDBTap) {
-            return _id == ((ElephantDBTap) object)._id;
+        if (object instanceof EDBSearchTap) {
+            return _id == ((EDBSearchTap) object)._id;
         } else {
             return false;
         }
@@ -67,3 +72,4 @@ public class ElephantDBTap extends ElephantBaseTap {
     private int _id;
     private static int globalid = 0;
 }
+
