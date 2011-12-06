@@ -34,13 +34,13 @@ public class ElephantDBTap extends ElephantBaseTap {
     // TODO: Modify this to use the DomainSpec deserializer. key is a NullWritable,
     @Override public Tuple source(Object key, Object value) {
         byte[] valBytes = Utils.getBytes((BytesWritable) value);
-        KeyValDocument doc = _kryoBuf.readObject(valBytes, KeyValDocument.class);
+        KeyValDocument doc = _spec.deserialize(valBytes, KeyValDocument.class);
         return new Tuple(doc.key, doc.value);
     }
 
     /**
      * Sinks 3-tuples of the form [shardIdx, key, val] out to Hadoop. key and val are serialized
-     * with Kryo.
+     * with Kryo. 
      * @param tupleEntry
      * @param outputCollector
      * @throws IOException
@@ -52,8 +52,8 @@ public class ElephantDBTap extends ElephantBaseTap {
         Object val = tupleEntry.get(2);
 
         KeyValDocument<Object, Object> doc = new KeyValDocument<Object, Object>(key, val);
-        byte[] docbytes = _kryoBuf.writeClassAndObject(doc);
-        outputCollector.collect(new IntWritable(shard), new BytesWritable(docbytes));
+        byte[] serialized = _spec.serialize(doc);
+        outputCollector.collect(new IntWritable(shard), new BytesWritable(serialized));
     }
 
     // TODO: Implement hashcode and equals in the superclass.

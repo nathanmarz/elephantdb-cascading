@@ -7,7 +7,7 @@
            [cascading.tuple Fields Tuple TupleEntry]
            [cascading.flow FlowConnector]
            [cascading.tap Hfs]
-           [elephantdb.persistence JavaBerkDB LocalPersistenceFactory]
+           [elephantdb.persistence JavaBerkDB PersistenceCoordinator]
            [elephantdb DomainSpec Utils]
            [elephantdb.hadoop ReplaceUpdater]
            [elephantdb.cascading ElephantDBTap

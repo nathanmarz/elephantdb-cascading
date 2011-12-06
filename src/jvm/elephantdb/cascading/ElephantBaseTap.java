@@ -7,13 +7,10 @@ import cascading.tap.TapException;
 import cascading.tap.hadoop.TapCollector;
 import cascading.tap.hadoop.TapIterator;
 import cascading.tuple.*;
-import com.esotericsoftware.kryo.ObjectBuffer;
 import elephantdb.DomainSpec;
 import elephantdb.Utils;
 import elephantdb.hadoop.*;
-import elephantdb.persistence.KeyValDocument;
-import elephantdb.persistence.LocalPersistenceFactory;
-import elephantdb.persistence.Transmitter;
+import elephantdb.persistence.PersistenceCoordinator;
 import elephantdb.store.DomainStore;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.BytesWritable;
@@ -21,7 +18,6 @@ import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.mapred.FileInputFormat;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.OutputCollector;
-import sun.plugin2.message.Serializer;
 
 import java.io.IOException;
 import java.io.Serializable;
@@ -52,8 +48,7 @@ public abstract class ElephantBaseTap extends Tap implements FlowListener {
 
     String _domainDir;
     DomainSpec _spec;
-    LocalPersistenceFactory _fact;
-    ObjectBuffer _kryoBuf;
+    PersistenceCoordinator _coordinator;
     Args _args;
     String _newVersionPath;
 
@@ -61,8 +56,7 @@ public abstract class ElephantBaseTap extends Tap implements FlowListener {
         super(new ElephantScheme());
         _domainDir = dir;
         _spec = new DomainStore(dir, spec).getSpec();
-        _fact = _spec.getLPFactory();
-        _kryoBuf = _spec.getObjectBuffer();
+        _coordinator = _spec.getCoordinator();
 
         _args = args;
     }
@@ -92,7 +86,7 @@ public abstract class ElephantBaseTap extends Tap implements FlowListener {
 
     @Override public Tuple source(Object key, Object value) {
         byte[] valBytes = Utils.getBytes((BytesWritable) value);
-        Object doc = _kryoBuf.readClassAndObject(valBytes);
+        Object doc = _spec.deserialize(valBytes);
         return new Tuple(doc);
     }
 
@@ -121,7 +115,7 @@ public abstract class ElephantBaseTap extends Tap implements FlowListener {
         throws IOException {
         int shard = tupleEntry.getInteger(0);
         Object doc = tupleEntry.get(1);
-        byte[] crushedDocument = _kryoBuf.writeClassAndObject(doc);
+        byte[] crushedDocument = _spec.serialize(doc);
         outputCollector.collect(new IntWritable(shard), new BytesWritable(crushedDocument));
     }
 
