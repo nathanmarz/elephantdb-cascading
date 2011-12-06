@@ -7,11 +7,9 @@ import elephantdb.Utils;
 import elephantdb.persistence.KeyValDocument;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.IntWritable;
-import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapred.OutputCollector;
 
 import java.io.IOException;
-
 
 public class ElephantDBTap extends ElephantBaseTap {
 

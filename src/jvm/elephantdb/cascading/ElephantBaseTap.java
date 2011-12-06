@@ -26,7 +26,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.UUID;
 
-
 public abstract class ElephantBaseTap extends Tap implements FlowListener {
 
     public static class Args implements Serializable {
