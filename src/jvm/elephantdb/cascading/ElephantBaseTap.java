@@ -7,9 +7,11 @@ import cascading.tap.TapException;
 import cascading.tap.hadoop.TapCollector;
 import cascading.tap.hadoop.TapIterator;
 import cascading.tuple.*;
+import com.esotericsoftware.kryo.ObjectBuffer;
 import elephantdb.DomainSpec;
 import elephantdb.Utils;
 import elephantdb.hadoop.*;
+import elephantdb.persistence.KeyValDocument;
 import elephantdb.persistence.LocalPersistenceFactory;
 import elephantdb.persistence.Transmitter;
 import elephantdb.store.DomainStore;
@@ -41,7 +43,6 @@ public abstract class ElephantBaseTap extends Tap implements FlowListener {
         public Fields sourceFields = new Fields("key", "value");
         public Long version = null; //for sourcing
         public Deserializer deserializer = null;
-        public Serializer serializer = null;
 
         //sink specific
         public Fields sinkFields = Fields.ALL;
@@ -52,6 +53,7 @@ public abstract class ElephantBaseTap extends Tap implements FlowListener {
     String _domainDir;
     DomainSpec _spec;
     LocalPersistenceFactory _fact;
+    ObjectBuffer _kryoBuf;
     Args _args;
     String _newVersionPath;
 
@@ -60,6 +62,7 @@ public abstract class ElephantBaseTap extends Tap implements FlowListener {
         _domainDir = dir;
         _spec = new DomainStore(dir, spec).getSpec();
         _fact = _spec.getLPFactory();
+        _kryoBuf = _spec.getObjectBuffer();
 
         _args = args;
     }
@@ -87,14 +90,10 @@ public abstract class ElephantBaseTap extends Tap implements FlowListener {
         return true;
     }
 
-    @Override
-    public Tuple source(Object key, Object value) {
-        // IS THIS the way for us? Do we want to deserialize both?
-        // These result from the InputFormat's next method. Both are BytesWritable.
-
-        key = (_args.deserializer == null) ? key :
-            _args.deserializer.deserialize((BytesWritable) key);
-        return new Tuple(key, value);
+    @Override public Tuple source(Object key, Object value) {
+        byte[] valBytes = Utils.getBytes((BytesWritable) value);
+        Object doc = _kryoBuf.readClassAndObject(valBytes);
+        return new Tuple(doc);
     }
 
     @Override
@@ -121,17 +120,9 @@ public abstract class ElephantBaseTap extends Tap implements FlowListener {
     @Override public void sink(TupleEntry tupleEntry, OutputCollector outputCollector)
         throws IOException {
         int shard = tupleEntry.getInteger(0);
-        Object key = tupleEntry.get(1);
-        BytesWritable val = (BytesWritable) tupleEntry.get(2);
-
-        // TODO: Need a better way of serializing than this.
-        // This should happen from an interface; take the objects, generate BytesWritable objects.
-        Transmitter trans = _fact.getTransmitter();
-        byte[] keybytes = trans.serializeKey(key);
-        byte[] valuebytes = trans.serializeVal(val);
-
-        ElephantRecordWritable record = new ElephantRecordWritable(keybytes, valuebytes);
-        outputCollector.collect(new IntWritable(shard), record);
+        Object doc = tupleEntry.get(1);
+        byte[] crushedDocument = _kryoBuf.writeClassAndObject(doc);
+        outputCollector.collect(new IntWritable(shard), new BytesWritable(crushedDocument));
     }
 
     public ElephantOutputFormat.Args outputArgs(JobConf conf) throws IOException {

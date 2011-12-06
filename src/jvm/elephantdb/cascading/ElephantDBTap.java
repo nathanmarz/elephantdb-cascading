@@ -3,10 +3,11 @@ package elephantdb.cascading;
 import cascading.tuple.Tuple;
 import cascading.tuple.TupleEntry;
 import elephantdb.DomainSpec;
-import elephantdb.hadoop.ElephantRecordWritable;
-import elephantdb.persistence.Transmitter;
+import elephantdb.Utils;
+import elephantdb.persistence.KeyValDocument;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapred.OutputCollector;
 
 import java.io.IOException;
@@ -30,25 +31,29 @@ public class ElephantDBTap extends ElephantBaseTap {
         super(dir, spec, args);
     }
 
+    // TODO: Modify this to use the DomainSpec deserializer. key is a NullWritable,
     @Override public Tuple source(Object key, Object value) {
-        key = (_args.deserializer == null) ? key :
-            _args.deserializer.deserialize((BytesWritable) key);
-        return new Tuple(key, value);
+        byte[] valBytes = Utils.getBytes((BytesWritable) value);
+        KeyValDocument doc = _kryoBuf.readObject(valBytes, KeyValDocument.class);
+        return new Tuple(doc.key, doc.value);
     }
 
-    // This is generic between implementations.
+    /**
+     * Sinks 3-tuples of the form [shardIdx, key, val] out to Hadoop. key and val are serialized
+     * with Kryo.
+     * @param tupleEntry
+     * @param outputCollector
+     * @throws IOException
+     */
     @Override public void sink(TupleEntry tupleEntry, OutputCollector outputCollector)
         throws IOException {
         int shard = tupleEntry.getInteger(0);
         Object key = tupleEntry.get(1);
         Object val = tupleEntry.get(2);
 
-        Transmitter trans = _fact.getTransmitter();
-        byte[] keybytes = trans.serializeKey(key);
-        byte[] valuebytes = trans.serializeVal(val);
-
-        ElephantRecordWritable record = new ElephantRecordWritable(keybytes, valuebytes);
-        outputCollector.collect(new IntWritable(shard), record);
+        KeyValDocument<Object, Object> doc = new KeyValDocument<Object, Object>(key, val);
+        byte[] docbytes = _kryoBuf.writeClassAndObject(doc);
+        outputCollector.collect(new IntWritable(shard), new BytesWritable(docbytes));
     }
 
     // TODO: Implement hashcode and equals in the superclass.

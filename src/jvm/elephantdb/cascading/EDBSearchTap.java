@@ -31,7 +31,7 @@ public class EDBSearchTap extends ElephantBaseTap {
         super(dir, spec, args);
     }
 
-    // Obviously needs to change for search.
+    // TODO: needs to change for search.
     @Override public Tuple source(Object key, Object value) {
         key = (_args.deserializer == null) ? key :
             _args.deserializer.deserialize((BytesWritable) key);

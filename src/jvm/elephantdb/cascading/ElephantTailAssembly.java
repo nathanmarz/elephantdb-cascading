@@ -33,6 +33,7 @@ public class ElephantTailAssembly extends SubAssembly {
             Object key = call.getArguments().get(0);
             Object val = call.getArguments().get(1);
 
+            // actually serialize with Kryo. TODO: Does domain-spec need Document class?
             byte[] serkey = _fact.getTransmitter().serializeKey(key);
             int shard = _fact.getSharder().shardIndex(_numShards, key, val);
             call.getOutputCollector().add(new Tuple(shard));
@@ -57,13 +58,13 @@ public class ElephantTailAssembly extends SubAssembly {
     }
 
     public ElephantTailAssembly(Pipe keyValuePairs, ElephantDBTap outTap) {
-
         // generate two random field names
         String shardfield = "shard" + UUID.randomUUID().toString();
         String keysortfield = "keysort" + UUID.randomUUID().toString();
 
         LocalPersistenceFactory lp = outTap.getSpec().getLPFactory();
         int numShards = outTap.getSpec().getNumShards();
+
         // shardize the key.
         Pipe out = new Each(keyValuePairs, new Fields(0), new Shardize(shardfield, numShards, lp), Fields.ALL);
         out = new Each(out, new Fields(0), new MakeSortableKey(keysortfield, lp), Fields.ALL);
