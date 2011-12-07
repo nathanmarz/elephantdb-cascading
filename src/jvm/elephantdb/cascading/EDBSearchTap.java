@@ -3,11 +3,14 @@ package elephantdb.cascading;
 import cascading.tuple.Tuple;
 import cascading.tuple.TupleEntry;
 import elephantdb.DomainSpec;
+import elephantdb.Utils;
 import elephantdb.hadoop.ElephantRecordWritable;
+import elephantdb.persistence.KeyValDocument;
 import elephantdb.persistence.Transmitter;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.mapred.OutputCollector;
+import org.apache.lucene.document.Document;
 
 import java.io.IOException;
 
@@ -31,34 +34,15 @@ public class EDBSearchTap extends ElephantBaseTap {
         super(dir, spec, args);
     }
 
-    // TODO: needs to change for search.
     @Override public Tuple source(Object key, Object value) {
-        key = (_args.deserializer == null) ? key :
-            _args.deserializer.deserialize((BytesWritable) key);
-        return new Tuple(key, value);
-    }
-
-    // Generic! Serialization's implemented with the transmitter.
-    // Can take any object, at this point.
-    // TODO: Remove this from here and ElephantDBTap.
-    @Override public void sink(TupleEntry tupleEntry, OutputCollector outputCollector)
-        throws IOException {
-        int shard = tupleEntry.getInteger(0);
-        Object key = tupleEntry.get(1);
-        Object val = tupleEntry.get(2);
-
-        Transmitter trans = _fact.getTransmitter();
-        byte[] keybytes = trans.serializeKey(key);
-        byte[] valuebytes = trans.serializeVal(val);
-
-        ElephantRecordWritable record = new ElephantRecordWritable(keybytes, valuebytes);
-        outputCollector.collect(new IntWritable(shard), record);
+        byte[] valBytes = Utils.getBytes((BytesWritable) value);
+        Document doc = _spec.deserialize(valBytes, Document.class);
+        return new Tuple(doc);
     }
 
     // TODO: Implement hashcode and equals in the superclass.
     @Override public int hashCode() {
         return new Integer(_id).hashCode();
-
     }
 
     @Override public boolean equals(Object object) {

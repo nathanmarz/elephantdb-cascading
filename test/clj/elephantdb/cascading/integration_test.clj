@@ -1,17 +1,17 @@
 (ns elephantdb.cascading.integration-test
   (:use clojure.test
-        elephantdb.testing)
+        elephantdb.common.testing)
+  (:require [elephantdb.keyval.testing :as t])
   (:import [cascading.operation Identity]
            [cascading.pipe Each GroupBy Pipe SubAssembly]
            [cascading.operation Debug]
            [cascading.tuple Fields Tuple TupleEntry]
            [cascading.flow FlowConnector]
            [cascading.tap Hfs]
-           [elephantdb.persistence JavaBerkDB PersistenceCoordinator]
+           [elephantdb.persistence JavaBerkDB HashModScheme PersistenceCoordinator]
            [elephantdb DomainSpec Utils]
            [elephantdb.hadoop ReplaceUpdater]
-           [elephantdb.cascading ElephantDBTap
-            ElephantDBTap$Args ElephantTailAssembly]
+           [elephantdb.cascading ElephantDBTap ElephantBaseTap$Args ElephantTailAssembly]
            [org.apache.hadoop.io BytesWritable IntWritable]
            [org.apache.hadoop.mapred JobConf]))
 
@@ -32,16 +32,16 @@
       (.complete flow))))
 
 (defn mk-options [updater]
-  (let [ret (ElephantDBTap$Args.)]
+  (let [ret (ElephantBaseTap$Args.)]
     (set! (. ret updater) updater)
     ret))
 
 (defn check-results [dpath pairs]
-  (with-single-service-handler [handler {"domain" dpath}]
-    (check-domain "domain" handler pairs)))
+  (t/with-single-service-handler [handler {"domain" dpath}]
+    (t/check-domain "domain" handler pairs)))
 
 (def-fs-test test-basic [fs tmp]
-  (let [spec (DomainSpec. (JavaBerkDB.) 4)
+  (let [spec (DomainSpec. (JavaBerkDB.) (HashModScheme.) 4)
         sink (ElephantDBTap. tmp spec (mk-options nil))
         data [[(barr 0) (barr 0 0)]
               [(barr 1) (barr 1 1)]
@@ -60,7 +60,7 @@
     (check-results tmp (conj data2 [(barr 1) nil]))))
 
 (def-fs-test test-incremental [fs tmp]
-  (let [spec (DomainSpec. (JavaBerkDB.) 2)
+  (let [spec (DomainSpec. (JavaBerkDB.) (HashModScheme.) 2)
         sink (ElephantDBTap. tmp spec (mk-options (ReplaceUpdater.)))
         data [[(barr 0) (barr 0 0)]
               [(barr 1) (barr 1 1)]
@@ -105,8 +105,8 @@
                [(barr 81) (barr 9 9 9 1)]
                [(barr 9) (barr 9 9 2)]
                [(barr 102) (barr 3 6)]]]
-    (with-sharded-domain [dpath
-                          {:num-shards 6
-                           :persistence-factory (JavaBerkDB.)}
-                          pairs]
-      (is (kv-pairs= pairs (read-etap-with-flow dpath))))))
+    (t/with-sharded-domain [dpath
+                            {:num-shards 6
+                             :persistence-factory (JavaBerkDB.)}
+                            pairs]
+      (is (t/kv-pairs= pairs (read-etap-with-flow dpath))))))
