@@ -14,27 +14,28 @@ import cascading.tuple.Tuple;
 import elephantdb.DomainSpec;
 import elephantdb.persistence.HashModScheme;
 import org.apache.hadoop.io.BytesWritable;
+import org.apache.log4j.Logger;
 
 import java.util.UUID;
 
 public class ElephantTailAssembly extends SubAssembly {
+    public static Logger LOG = Logger.getLogger(ElephantTailAssembly.class);
 
     public static class Shardize extends BaseOperation implements Function {
+        DomainSpec _spec;
         int _numShards;
-        HashModScheme _scheme;
 
-        // Pass in an object that implements the KeySharder interface.
         public Shardize(String outfield, DomainSpec spec) {
             super(new Fields(outfield));
-            _scheme = (HashModScheme) spec.getShardScheme();
+
+            _spec = spec;
             _numShards = spec.getNumShards();
         }
 
         public void operate(FlowProcess process, FunctionCall call) {
             Object key = call.getArguments().get(0);
 
-            int shard = _scheme.shardIndex(key);
-            
+            int shard = _spec.getShardScheme().shardIndex(key);
             call.getOutputCollector().add(new Tuple(shard));
         }
     }
@@ -60,7 +61,7 @@ public class ElephantTailAssembly extends SubAssembly {
         String keySortField = "keysort" + UUID.randomUUID().toString();
 
         DomainSpec spec = outTap.getSpec();
-        int numShards = outTap.getSpec().getNumShards();
+        LOG.info("Instantiating spec: " + spec);
 
         // Add the shard index as field #2.
         Pipe out = new Each(keyValuePairs, new Fields(0), new Shardize(shardField, spec), Fields.ALL);

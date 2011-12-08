@@ -2,15 +2,13 @@
   (:use clojure.test
         elephantdb.common.testing)
   (:require [elephantdb.keyval.testing :as t])
-  (:import [cascading.operation Identity]
-           [cascading.pipe Each GroupBy Pipe SubAssembly]
-           [cascading.operation Debug]
-           [cascading.tuple Fields Tuple TupleEntry]
+  (:import [cascading.pipe Pipe]
+           [cascading.tuple Fields Tuple]
            [cascading.flow FlowConnector]
            [cascading.tap Hfs]
            [elephantdb.persistence JavaBerkDB HashModScheme PersistenceCoordinator]
            [elephantdb DomainSpec Utils]
-           [elephantdb.hadoop ReplaceUpdater]
+           [elephantdb.hadoop IdentityUpdater]
            [elephantdb.cascading ElephantDBTap ElephantBaseTap$Args ElephantTailAssembly]
            [org.apache.hadoop.io BytesWritable IntWritable]
            [org.apache.hadoop.mapred JobConf]))
@@ -19,7 +17,7 @@
   (let [source (Hfs. (Fields. (into-array ["key" "value"])) tmppath)
         coll (.openForWrite source (JobConf.))]
     (doseq [[k v] pairs]
-      (.add coll (Tuple. (into-array Object [(BytesWritable. k) (BytesWritable. v)]))))
+      (.add coll (Tuple. (into-array Object [k v]))))
     (.close coll)
     source))
 
@@ -43,17 +41,17 @@
 (def-fs-test test-basic [fs tmp]
   (let [spec (DomainSpec. (JavaBerkDB.) (HashModScheme.) 4)
         sink (ElephantDBTap. tmp spec (mk-options nil))
-        data [[(barr 0) (barr 0 0)]
-              [(barr 1) (barr 1 1)]
-              [(barr 2) (barr 2 2)]
-              [(barr 3) (barr 3 3)]
-              [(barr 4) (barr 4 4)]
-              [(barr 5) (barr 5 5)]
-              [(barr 6) (barr 6 5)]
-              [(barr 7) (barr 7 5)]
-              [(barr 8) (barr 8 5)]]
-        data2 [[(barr 0) (barr 1)
-                (barr 10) (barr 100)]]]
+        data [[0 (barr 0 0)]
+              [1 (barr 1 1)]
+              [2 (barr 2 2)]
+              [3 (barr 3 3)]
+              [4 (barr 4 4)]
+              [5 (barr 5 5)]
+              [6 (barr 6 5)]
+              [7 (barr 7 5)]
+              [8 (barr 8 5)]]
+        data2 [[0 (barr 1)
+                10 (barr 100)]]]
     (emit-to-sink sink data)
     (check-results tmp data)
     (emit-to-sink sink data2)
@@ -61,7 +59,7 @@
 
 (def-fs-test test-incremental [fs tmp]
   (let [spec (DomainSpec. (JavaBerkDB.) (HashModScheme.) 2)
-        sink (ElephantDBTap. tmp spec (mk-options (ReplaceUpdater.)))
+        sink (ElephantDBTap. tmp spec (mk-options (IdentityUpdater.)))
         data [[(barr 0) (barr 0 0)]
               [(barr 1) (barr 1 1)]
               [(barr 2) (barr 2 2)]]

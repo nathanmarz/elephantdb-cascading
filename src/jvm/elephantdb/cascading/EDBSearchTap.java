@@ -1,15 +1,9 @@
 package elephantdb.cascading;
 
 import cascading.tuple.Tuple;
-import cascading.tuple.TupleEntry;
 import elephantdb.DomainSpec;
 import elephantdb.Utils;
-import elephantdb.hadoop.ElephantRecordWritable;
-import elephantdb.persistence.KeyValDocument;
-import elephantdb.persistence.Transmitter;
 import org.apache.hadoop.io.BytesWritable;
-import org.apache.hadoop.io.IntWritable;
-import org.apache.hadoop.mapred.OutputCollector;
 import org.apache.lucene.document.Document;
 
 import java.io.IOException;

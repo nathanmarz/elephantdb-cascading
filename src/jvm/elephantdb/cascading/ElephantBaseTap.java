@@ -37,11 +37,10 @@ public abstract class ElephantBaseTap extends Tap implements FlowListener {
         //source specific
         public Fields sourceFields = new Fields("key", "value");
         public Long version = null; //for sourcing
-        public Deserializer deserializer = null;
 
         //sink specific
         public Fields sinkFields = Fields.ALL;
-        public ElephantUpdater updater = new ReplaceUpdater();
+        public ElephantUpdater updater = new IdentityUpdater();
         //set this to null to prevent updating
     }
 
