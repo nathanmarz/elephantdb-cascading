@@ -78,7 +78,6 @@
     (-> (create-source tmp pairs)
         (hfs->elephant elephant-sink))))
 
-;; TODO: Use custom EDB JobConf here.
 (defn get-tuples
   "Returns all tuples in the supplied cascading tap as a Clojure
   sequence."
@@ -107,15 +106,15 @@
 (defn check-results
   "TODO: Move over to edb proper."
   [dpath pairs]
-  (t/with-single-service-handler [handler {"domain" dpath}]
-    (t/check-domain "domain" handler pairs)))
+  (is (= (set (read-etap-with-flow dpath))
+         (set pairs))))
 
 ;; TODO: Invalid. Doesn't belong in this project; this makes far too
 ;; many assumptions about a thrift interface, etc. All we're concerned
 ;; about here is getting data in and out of edb w/ cascading.
 (def-fs-test test-basic [fs tmp]
   (let [spec (DomainSpec. (JavaBerkDB.) (HashModScheme.) 4)
-        sink (ElephantDBTap. tmp spec (mk-options nil))
+        sink (ElephantDBTap. tmp spec (mk-options :updater nil))
         data [[0 (barr 0 0)]
               [1 (barr 1 1)]
               [2 (barr 2 2)]
