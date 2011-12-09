@@ -8,12 +8,10 @@ import elephantdb.persistence.KeyValDocument;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.mapred.OutputCollector;
-import org.apache.log4j.Logger;
 
 import java.io.IOException;
 
 public class ElephantDBTap extends ElephantBaseTap {
-    public static final Logger LOG = Logger.getLogger(ElephantDBTap.class);
 
     public ElephantDBTap(String dir, Args args) throws IOException {
         this(dir, null, args);
@@ -33,6 +31,8 @@ public class ElephantDBTap extends ElephantBaseTap {
 
     // TODO: Modify this to use the DomainSpec deserializer. key is a NullWritable,
     @Override public Tuple source(Object key, Object value) {
+        LOG.debug("Sourcing: " + value);
+
         byte[] valBytes = Utils.getBytes((BytesWritable) value);
         KeyValDocument doc = (KeyValDocument) _spec.deserialize(valBytes);
         return new Tuple(doc.key, doc.value);
@@ -46,11 +46,12 @@ public class ElephantDBTap extends ElephantBaseTap {
      * @throws IOException
      */
     @Override public void sink(TupleEntry tupleEntry, OutputCollector outputCollector)
-
         throws IOException {
+        LOG.debug("Sinking: " + tupleEntry);
+
         int shard = tupleEntry.getInteger(0);
-        Object key = tupleEntry.get(1);
-        Object val = tupleEntry.get(2);
+        Object key = tupleEntry.getObject(1);
+        Object val = tupleEntry.getObject(2);
 
         KeyValDocument<Object, Object> doc = new KeyValDocument<Object, Object>(key, val);
         byte[] serialized = _spec.serialize(doc);

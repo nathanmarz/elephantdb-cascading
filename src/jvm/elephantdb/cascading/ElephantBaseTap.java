@@ -18,6 +18,7 @@ import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.mapred.FileInputFormat;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.OutputCollector;
+import org.apache.log4j.Logger;
 
 import java.io.IOException;
 import java.io.Serializable;
@@ -27,6 +28,7 @@ import java.util.Map.Entry;
 import java.util.UUID;
 
 public abstract class ElephantBaseTap extends Tap implements FlowListener {
+    public static final Logger LOG = Logger.getLogger(ElephantBaseTap.class);
 
     public static class Args implements Serializable {
         //for source and sink
@@ -90,8 +92,6 @@ public abstract class ElephantBaseTap extends Tap implements FlowListener {
 
     @Override
     public void sourceInit(JobConf conf) throws IOException {
-
-        // Why do we use this random string?
         FileInputFormat.setInputPaths(conf, "/" + UUID.randomUUID().toString());
 
         ElephantInputFormat.Args eargs = new ElephantInputFormat.Args(_domainDir);
@@ -112,7 +112,7 @@ public abstract class ElephantBaseTap extends Tap implements FlowListener {
     @Override public void sink(TupleEntry tupleEntry, OutputCollector outputCollector)
         throws IOException {
         int shard = tupleEntry.getInteger(0);
-        Object doc = tupleEntry.get(1);
+        Object doc = tupleEntry.getObject(1);
         byte[] crushedDocument = _spec.serialize(doc);
         outputCollector.collect(new IntWritable(shard), new BytesWritable(crushedDocument));
     }
@@ -138,7 +138,6 @@ public abstract class ElephantBaseTap extends Tap implements FlowListener {
     }
 
     @Override public void sinkInit(JobConf conf) throws IOException {
-
         ElephantOutputFormat.Args args = outputArgs(conf);
 
         // serialize this particular argument off into the JobConf.

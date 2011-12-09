@@ -12,7 +12,6 @@ import cascading.pipe.SubAssembly;
 import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
 import elephantdb.DomainSpec;
-import elephantdb.persistence.HashModScheme;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.log4j.Logger;
 
@@ -33,8 +32,12 @@ public class ElephantTailAssembly extends SubAssembly {
         }
 
         public void operate(FlowProcess process, FunctionCall call) {
-            Object key = call.getArguments().get(0);
+            LOG.info("Snagging shards!");
+            LOG.info("ARGS ARE: " + call.getArguments());
 
+            Object key = call.getArguments().getObject(0);
+
+            LOG.info("key is " + key);
             int shard = _spec.getShardScheme().shardIndex(key);
             call.getOutputCollector().add(new Tuple(shard));
         }
@@ -49,7 +52,7 @@ public class ElephantTailAssembly extends SubAssembly {
         }
 
         public void operate(FlowProcess process, FunctionCall call) {
-            Object key = call.getArguments().get(0);
+            Object key = call.getArguments().getObject(0);
             BytesWritable sortField = new BytesWritable(_spec.serialize(key));
             call.getOutputCollector().add(new Tuple(sortField));
         }

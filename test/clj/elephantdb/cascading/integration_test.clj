@@ -1,6 +1,7 @@
 (ns elephantdb.cascading.integration-test
   (:use clojure.test
-        elephantdb.common.testing)
+        elephantdb.common.testing
+        [clojure.string :only (join)])
   (:require [elephantdb.keyval.testing :as t])
   (:import [cascading.pipe Pipe]
            [cascading.tuple Fields Tuple]
@@ -26,10 +27,22 @@
     (set! (.updater ret) updater)
     ret))
 
+(def props
+  {"io.serializations"
+   (join "," ["org.apache.hadoop.io.serializer.WritableSerialization"
+              "cascading.tuple.hadoop.BytesSerialization"
+              "cascading.tuple.hadoop.TupleSerialization"])})
+
+(defn jobconf []
+  (let [conf (JobConf.)]
+    (doseq [[k v] props]
+      (.set conf k v))
+    conf))
+
 (defn create-source
   [tmp-path pairs]
   (let [src (kv-tap tmp-path)]
-    (with-open [collector (.openForWrite src (JobConf.))]
+    (with-open [collector (.openForWrite src (jobconf))]
       (doseq [[k v] pairs]
         (.add collector (Tuple. (into-array Object [k v])))))
     src))
@@ -37,7 +50,7 @@
 (defn connect
   "Connect the supplied source and sink with the supplied pipe."
   [pipe source sink]
-  (doto (.connect (FlowConnector.) source sink pipe)
+  (doto (.connect (FlowConnector. props) source sink pipe)
     (.complete)))
 
 (defn elephant->hfs
@@ -70,7 +83,7 @@
   "Returns all tuples in the supplied cascading tap as a Clojure
   sequence."
   [sink]
-  (with-open [it (.openForRead sink (JobConf.))]
+  (with-open [it (.openForRead sink (jobconf))]
     (doall (for [wrapper (iterator-seq it)]
              (into [] (.getTuple wrapper))))))
 
