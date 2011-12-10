@@ -32,13 +32,12 @@ public class ElephantTailAssembly extends SubAssembly {
         }
 
         public void operate(FlowProcess process, FunctionCall call) {
-            LOG.info("Snagging shards!");
-            LOG.info("ARGS ARE: " + call.getArguments());
+            LOG.info("Shard Args are: " + call.getArguments());
 
             Object key = call.getArguments().getObject(0);
 
             LOG.info("key is " + key);
-            int shard = _spec.getShardScheme().shardIndex(key);
+            int shard = _spec.shardIndex(key);
             call.getOutputCollector().add(new Tuple(shard));
         }
     }
@@ -53,7 +52,7 @@ public class ElephantTailAssembly extends SubAssembly {
 
         public void operate(FlowProcess process, FunctionCall call) {
             Object key = call.getArguments().getObject(0);
-            BytesWritable sortField = new BytesWritable(_spec.serialize(key));
+            BytesWritable sortField = new BytesWritable(_spec.getCoordinator().getKryoBuffer().serialize(key));
             call.getOutputCollector().add(new Tuple(sortField));
         }
     }

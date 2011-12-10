@@ -34,7 +34,8 @@ public class ElephantDBTap extends ElephantBaseTap {
         LOG.debug("Sourcing: " + value);
 
         byte[] valBytes = Utils.getBytes((BytesWritable) value);
-        KeyValDocument doc = (KeyValDocument) _spec.deserialize(valBytes);
+        KeyValDocument doc;
+        doc = (KeyValDocument) _coordinator.getKryoBuffer().deserialize(valBytes);
         return new Tuple(doc.key, doc.value);
     }
 
@@ -54,7 +55,7 @@ public class ElephantDBTap extends ElephantBaseTap {
         Object val = tupleEntry.getObject(2);
 
         KeyValDocument<Object, Object> doc = new KeyValDocument<Object, Object>(key, val);
-        byte[] serialized = _spec.serialize(doc);
+        byte[] serialized = _coordinator.getKryoBuffer().serialize(doc);
         outputCollector.collect(new IntWritable(shard), new BytesWritable(serialized));
     }
 
@@ -64,11 +65,7 @@ public class ElephantDBTap extends ElephantBaseTap {
     }
 
     @Override public boolean equals(Object object) {
-        if (object instanceof ElephantDBTap) {
-            return _id == ((ElephantDBTap) object)._id;
-        } else {
-            return false;
-        }
+        return object instanceof ElephantDBTap && _id == ((ElephantDBTap) object)._id;
     }
 
     private int _id;

@@ -30,7 +30,7 @@ public class EDBSearchTap extends ElephantBaseTap {
 
     @Override public Tuple source(Object key, Object value) {
         byte[] valBytes = Utils.getBytes((BytesWritable) value);
-        Document doc = _spec.deserialize(valBytes, Document.class);
+        Document doc = _coordinator.getKryoBuffer().deserialize(valBytes, Document.class);
         return new Tuple(doc);
     }
 

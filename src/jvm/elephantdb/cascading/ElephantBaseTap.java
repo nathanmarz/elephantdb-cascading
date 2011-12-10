@@ -2,6 +2,7 @@ package elephantdb.cascading;
 
 import cascading.flow.Flow;
 import cascading.flow.FlowListener;
+import cascading.kryo.KryoFactory;
 import cascading.tap.Tap;
 import cascading.tap.TapException;
 import cascading.tap.hadoop.TapCollector;
@@ -86,7 +87,7 @@ public abstract class ElephantBaseTap extends Tap implements FlowListener {
 
     @Override public Tuple source(Object key, Object value) {
         byte[] valBytes = Utils.getBytes((BytesWritable) value);
-        Object doc = _spec.deserialize(valBytes);
+        Object doc = _coordinator.getKryoBuffer().deserialize(valBytes);
         return new Tuple(doc);
     }
 
@@ -113,7 +114,7 @@ public abstract class ElephantBaseTap extends Tap implements FlowListener {
         throws IOException {
         int shard = tupleEntry.getInteger(0);
         Object doc = tupleEntry.getObject(1);
-        byte[] crushedDocument = _spec.serialize(doc);
+        byte[] crushedDocument = _coordinator.getKryoBuffer().serialize(doc);
         outputCollector.collect(new IntWritable(shard), new BytesWritable(crushedDocument));
     }
 
