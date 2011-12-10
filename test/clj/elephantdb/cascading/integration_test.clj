@@ -168,3 +168,21 @@
                              :persistence-factory (JavaBerkDB.)}
                             pairs]
       (is (t/kv-pairs= pairs (read-etap-with-flow dpath))))))
+
+;; Example of how to do stuff now.
+(def spec
+  (DomainSpec. (JavaBerkDB.)
+               (HashModScheme.)
+               4))
+
+(defn populate [idx]
+  (with-open [shard (.createShard spec "/Users/sritchie/Desktop/helper" idx)]
+    (doseq [x (range 1000)]
+      (.index shard (KeyValDocument. x 10)))))
+
+;; or, you can create a domain store directly:
+(def store
+  (DomainStore. "/Users/sritchie/Desktop/helper"
+                (DomainSpec. (JavaBerkDB.)
+                             (HashModScheme.)
+                             4)))

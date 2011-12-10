@@ -12,6 +12,7 @@ import cascading.pipe.SubAssembly;
 import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
 import elephantdb.DomainSpec;
+import elephantdb.persistence.KryoWrapper;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.log4j.Logger;
 
@@ -41,15 +42,17 @@ public class ElephantTailAssembly extends SubAssembly {
 
     public static class MakeSortableKey extends BaseOperation implements Function {
         DomainSpec _spec;
+        KryoWrapper.KryoBuffer _kryoBuf;
 
         public MakeSortableKey(String outfield, DomainSpec spec) {
             super(new Fields(outfield));
             _spec = spec;
+            _kryoBuf = _spec.getCoordinator().getKryoBuffer();
         }
 
         public void operate(FlowProcess process, FunctionCall call) {
             Object key = call.getArguments().getObject(0);
-            BytesWritable sortField = new BytesWritable(_spec.getCoordinator().getKryoBuffer().serialize(key));
+            BytesWritable sortField = new BytesWritable(_kryoBuf.serialize(key));
             call.getOutputCollector().add(new Tuple(sortField));
         }
     }
