@@ -22,13 +22,10 @@ public class ElephantTailAssembly extends SubAssembly {
 
     public static class Shardize extends BaseOperation implements Function {
         DomainSpec _spec;
-        int _numShards;
 
         public Shardize(String outfield, DomainSpec spec) {
             super(new Fields(outfield));
-
             _spec = spec;
-            _numShards = spec.getNumShards();
         }
 
         public void operate(FlowProcess process, FunctionCall call) {
