@@ -58,9 +58,16 @@ public class ElephantScheme extends Scheme<HadoopFlowProcess, JobConf, RecordRea
         NullWritable key = (NullWritable) sourceCall.getContext()[0];
         BytesWritable value = (BytesWritable) sourceCall.getContext()[1];
 
+        // sourceCall.getInput().getClass() returns org.apache.hadoop.mapred.MapTask$TrackedRecordReader
+        // hadoopFlowProcess.getJobConf().getInputFormat() is correct.
+
         boolean result = sourceCall.getInput().next(key, value);
 
-        if (!result) { return false; }
+        // code never makes it to here.
+
+        if (!result) {
+            return false;
+        }
 
         byte[] valBytes = Utils.getBytes(value);
         Object doc = _coordinator.getKryoBuffer().deserialize(valBytes);

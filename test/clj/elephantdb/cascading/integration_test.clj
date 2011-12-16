@@ -192,6 +192,11 @@
     (doseq [x (range 1000)]
       (.index shard (KeyValDocument. x 10)))))
 
+(defn extract [path idx]
+  (with-open [shard (.openShardForRead spec path idx)
+              iter (.iterator shard)]
+    (doall (iterator-seq iter))))
+
 ;; or, you can create a domain store directly:
 (def store
   (DomainStore. "/Users/sritchie/Desktop/helper"
