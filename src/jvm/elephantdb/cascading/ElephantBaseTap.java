@@ -103,8 +103,7 @@ public abstract class ElephantBaseTap<G extends IGateway>
         conf.setInt("mapred.task.timeout", _args.timeoutMs);
         Utils.setObject(conf, ElephantInputFormat.ARGS_CONF, eargs);
 
-        conf.setOutputValueClass( BytesWritable.class ); // be explicit
-        conf.setInputFormat(ElephantInputFormat.class);
+        super.sourceConfInit( null, conf );
     }
 
     @Override public void sinkConfInit(HadoopFlowProcess process, JobConf conf) {
@@ -121,11 +120,7 @@ public abstract class ElephantBaseTap<G extends IGateway>
         conf.setBoolean("mapred.reduce.tasks.speculative.execution", false);
         conf.setInt("mapred.reduce.tasks", _spec.getNumShards());
 
-        conf.setOutputKeyClass( IntWritable.class ); // be explicit
-        conf.setOutputValueClass( BytesWritable.class ); // be explicit
-        conf.setOutputFormat(ElephantOutputFormat.class);
-        System.out.println("IN TAP, TRYING TO SET: " + ElephantOutputFormat.class);
-        System.out.println("IN TAP, ACTUALLY SET: " + conf.getOutputFormat());
+        super.sinkConfInit( null, conf );
     }
 
     public ElephantOutputFormat.Args outputArgs(JobConf conf) throws IOException {
