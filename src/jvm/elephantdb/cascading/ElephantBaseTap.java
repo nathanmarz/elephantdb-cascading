@@ -49,12 +49,13 @@ public abstract class ElephantBaseTap<G extends IGateway> extends Hfs implements
     String _newVersionPath;
 
     public ElephantBaseTap(String dir, DomainSpec spec, Args args) throws IOException {
-        super(Fields.ALL, dir);
-
         _domainDir = dir;
         _args = args;
         _spec = new DomainStore(dir, spec).getSpec();
-        setScheme(new ElephantScheme(_spec.getCoordinator(), freshGateway()));
+
+        setStringPath(_domainDir);
+        setScheme(new ElephantScheme(
+            _args.sourceFields, _args.sinkFields, _spec.getCoordinator(), freshGateway()));
     }
 
     public abstract G freshGateway();
@@ -65,18 +66,6 @@ public abstract class ElephantBaseTap<G extends IGateway> extends Hfs implements
 
     public DomainSpec getSpec() {
         return _spec;
-    }
-
-    @Override public Fields getSourceFields() {
-        return _args.sourceFields;
-    }
-
-    @Override public Fields getSinkFields() {
-        return _args.sinkFields;
-    }
-
-    @Override public boolean isSink() {
-        return true;
     }
 
     @Override public void sourceConfInit(HadoopFlowProcess process, JobConf conf) {
@@ -169,7 +158,9 @@ public abstract class ElephantBaseTap<G extends IGateway> extends Hfs implements
 
     private boolean isSinkOf(Flow<JobConf> flow) {
         for (Entry<String, Tap> e : flow.getSinks().entrySet()) {
-            if (e.getValue() == this) { return true; }
+            if (e.getValue() == this) {
+                return true;
+            }
         }
         return false;
     }

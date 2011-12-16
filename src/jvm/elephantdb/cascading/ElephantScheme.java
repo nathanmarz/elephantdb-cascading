@@ -5,6 +5,7 @@ import cascading.scheme.Scheme;
 import cascading.scheme.SinkCall;
 import cascading.scheme.SourceCall;
 import cascading.tap.Tap;
+import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
 import elephantdb.Utils;
 import elephantdb.hadoop.ElephantInputFormat;
@@ -19,13 +20,16 @@ import org.apache.hadoop.mapred.RecordReader;
 
 import java.io.IOException;
 
-public class ElephantScheme extends Scheme<HadoopFlowProcess, JobConf, RecordReader,
-    OutputCollector<IntWritable, BytesWritable>, Object[], Object[]> {
+public class ElephantScheme extends Scheme<HadoopFlowProcess, JobConf,
+    RecordReader, OutputCollector, Object[], Object[]> {
 
     PersistenceCoordinator _coordinator;
     IGateway _gateway;
 
-    public ElephantScheme(PersistenceCoordinator coordinator, IGateway gateway) {
+    public ElephantScheme(Fields sourceFields, Fields sinkFields,
+        PersistenceCoordinator coordinator, IGateway gateway) {
+        setSourceFields(sourceFields);
+        setSinkFields(sinkFields);
         _coordinator = coordinator;
         _gateway = gateway;
     }
@@ -52,18 +56,13 @@ public class ElephantScheme extends Scheme<HadoopFlowProcess, JobConf, RecordRea
         sourceCall.getContext()[1] = sourceCall.getInput().createValue();
     }
 
-    @Override public boolean source(HadoopFlowProcess hadoopFlowProcess,
+    @Override public boolean source(HadoopFlowProcess flowProcess,
         SourceCall<Object[], RecordReader> sourceCall) throws IOException {
 
         NullWritable key = (NullWritable) sourceCall.getContext()[0];
         BytesWritable value = (BytesWritable) sourceCall.getContext()[1];
 
-        // sourceCall.getInput().getClass() returns org.apache.hadoop.mapred.MapTask$TrackedRecordReader
-        // hadoopFlowProcess.getJobConf().getInputFormat() is correct.
-
         boolean result = sourceCall.getInput().next(key, value);
-
-        // code never makes it to here.
 
         if (!result) {
             return false;
@@ -76,8 +75,8 @@ public class ElephantScheme extends Scheme<HadoopFlowProcess, JobConf, RecordRea
         return true;
     }
 
-    @Override public void sink(HadoopFlowProcess hadoopFlowProcess,
-        SinkCall<Object[], OutputCollector<IntWritable, BytesWritable>> sinkCall) throws IOException {
+    @Override public void sink(HadoopFlowProcess flowProcess,
+        SinkCall<Object[], OutputCollector> sinkCall) throws IOException {
         Tuple tuple = sinkCall.getOutgoingEntry().getTuple();
 
         int shard = tuple.getInteger(0);
