@@ -6,6 +6,7 @@ import cascading.flow.hadoop.HadoopFlowProcess;
 import cascading.tap.Tap;
 import cascading.tap.TapException;
 import cascading.tuple.Fields;
+import cascading.tuple.TupleEntryCollector;
 import cascading.tuple.TupleEntryIterator;
 import cascading.tuple.TupleEntrySchemeIterator;
 import elephantdb.DomainSpec;
@@ -13,6 +14,8 @@ import elephantdb.Utils;
 import elephantdb.hadoop.*;
 import elephantdb.store.DomainStore;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.BytesWritable;
+import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.mapred.FileInputFormat;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.OutputCollector;
@@ -99,6 +102,8 @@ public abstract class ElephantBaseTap<G extends IGateway>
 
         conf.setInt("mapred.task.timeout", _args.timeoutMs);
         Utils.setObject(conf, ElephantInputFormat.ARGS_CONF, eargs);
+
+        conf.setOutputValueClass( BytesWritable.class ); // be explicit
         conf.setInputFormat(ElephantInputFormat.class);
     }
 
@@ -115,7 +120,12 @@ public abstract class ElephantBaseTap<G extends IGateway>
         conf.setInt("mapred.task.timeout", _args.timeoutMs);
         conf.setBoolean("mapred.reduce.tasks.speculative.execution", false);
         conf.setInt("mapred.reduce.tasks", _spec.getNumShards());
+
+        conf.setOutputKeyClass( IntWritable.class ); // be explicit
+        conf.setOutputValueClass( BytesWritable.class ); // be explicit
         conf.setOutputFormat(ElephantOutputFormat.class);
+        System.out.println("IN TAP, TRYING TO SET: " + ElephantOutputFormat.class);
+        System.out.println("IN TAP, ACTUALLY SET: " + conf.getOutputFormat());
     }
 
     public ElephantOutputFormat.Args outputArgs(JobConf conf) throws IOException {
@@ -168,11 +178,9 @@ public abstract class ElephantBaseTap<G extends IGateway>
     }
 
     public void onStarting(Flow flow) {
-
     }
 
     public void onStopping(Flow flow) {
-
     }
 
     private boolean isSinkOf(Flow<JobConf> flow) {
@@ -205,6 +213,19 @@ public abstract class ElephantBaseTap<G extends IGateway>
 
     public boolean onThrowable(Flow flow, Throwable t) {
         return false;
+    }
+
+    @Override
+    public TupleEntryCollector openForWrite( HadoopFlowProcess flowProcess, OutputCollector output ) throws IOException
+    {
+        if( output != null )
+            return super.openForWrite( flowProcess, output );
+
+        HadoopTapCollector schemeCollector = new HadoopTapCollector( flowProcess, this );
+
+        schemeCollector.prepare();
+
+        return schemeCollector;
     }
 
     @Override

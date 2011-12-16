@@ -30,11 +30,7 @@ public class ElephantTailAssembly extends SubAssembly {
         }
 
         public void operate(FlowProcess process, FunctionCall call) {
-            LOG.info("Shard Args are: " + call.getArguments());
-
             Object key = call.getArguments().getObject(0);
-
-            LOG.info("key is " + key);
             int shard = _spec.shardIndex(key);
             call.getOutputCollector().add(new Tuple(shard));
         }

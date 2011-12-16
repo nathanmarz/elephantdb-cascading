@@ -6,7 +6,6 @@ import cascading.scheme.SinkCall;
 import cascading.scheme.SourceCall;
 import cascading.tap.Tap;
 import cascading.tuple.Tuple;
-import cascading.tuple.TupleEntry;
 import elephantdb.Utils;
 import elephantdb.hadoop.ElephantInputFormat;
 import elephantdb.hadoop.ElephantOutputFormat;
@@ -21,7 +20,7 @@ import org.apache.hadoop.mapred.RecordReader;
 import java.io.IOException;
 
 public class ElephantScheme extends
-    Scheme<HadoopFlowProcess, JobConf, RecordReader, OutputCollector<IntWritable, BytesWritable>, Object[], Void> {
+    Scheme<HadoopFlowProcess, JobConf, RecordReader, OutputCollector<IntWritable, BytesWritable>, Object[], Object[]> {
 
     PersistenceCoordinator _coordinator;
     IGateway _gateway;
@@ -33,16 +32,20 @@ public class ElephantScheme extends
 
     @Override
     public void sourceConfInit(HadoopFlowProcess flowProcess, Tap tap, JobConf conf) {
+        conf.setOutputValueClass( BytesWritable.class ); // be explicit
         conf.setInputFormat(ElephantInputFormat.class);
     }
 
     @Override
     public void sinkConfInit(HadoopFlowProcess flowProcess, Tap tap, JobConf conf) {
+        conf.setOutputKeyClass( IntWritable.class ); // be explicit
+        conf.setOutputValueClass( BytesWritable.class ); // be explicit
         conf.setOutputFormat(ElephantOutputFormat.class);
     }
 
     @Override public void sourcePrepare(HadoopFlowProcess flowProcess,
         SourceCall<Object[], RecordReader> sourceCall) {
+
         sourceCall.setContext(new Object[2]);
 
         sourceCall.getContext()[0] = sourceCall.getInput().createKey();
@@ -62,16 +65,16 @@ public class ElephantScheme extends
         byte[] valBytes = Utils.getBytes(value);
         Object doc = _coordinator.getKryoBuffer().deserialize(valBytes);
 
-        sourceCall.getIncomingEntry().setTuple(new Tuple(doc));
+        sourceCall.getIncomingEntry().setTuple(_gateway.buildTuple(doc));
         return true;
     }
 
     @Override public void sink(HadoopFlowProcess hadoopFlowProcess,
-        SinkCall<Void, OutputCollector<IntWritable, BytesWritable>> sinkCall) throws IOException {
-        TupleEntry tuple = sinkCall.getOutgoingEntry();
+        SinkCall<Object[], OutputCollector<IntWritable, BytesWritable>> sinkCall) throws IOException {
+        Tuple tuple = sinkCall.getOutgoingEntry().getTuple();
 
         int shard = tuple.getInteger(0);
-        Object doc = tuple.getObject(1);
+        Object doc = _gateway.buildDocument(tuple);
 
         byte[] crushedDocument = _coordinator.getKryoBuffer().serialize(doc);
         sinkCall.getOutput().collect(new IntWritable(shard), new BytesWritable(crushedDocument));

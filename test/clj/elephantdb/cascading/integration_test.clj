@@ -5,9 +5,11 @@
   (:require [elephantdb.keyval.testing :as t])
   (:import [cascading.pipe Pipe]
            [cascading.tuple Fields Tuple]
-           [cascading.flow FlowConnector]
-           [cascading.tap Hfs]
-           [elephantdb.persistence JavaBerkDB HashModScheme PersistenceCoordinator]
+           [cascading.flow.hadoop HadoopFlowProcess HadoopFlowConnector]
+           [cascading.tap.hadoop Hfs]
+           [elephantdb.persistence JavaBerkDB HashModScheme
+            PersistenceCoordinator KeyValDocument]
+           [elephantdb.store DomainStore]
            [elephantdb DomainSpec Utils]
            [elephantdb.hadoop IdentityUpdater]
            [elephantdb.cascading ElephantDBTap
@@ -39,18 +41,22 @@
       (.set conf k v))
     conf))
 
+(defn to-tuple [coll]
+  (Tuple. (into-array Object coll)))
+
 (defn create-source
   [tmp-path pairs]
   (let [src (kv-tap tmp-path)]
-    (with-open [collector (.openForWrite src (jobconf))]
+    (with-open [collector (-> (HadoopFlowProcess. (jobconf))
+                              (.openTapForWrite src))]
       (doseq [[k v] pairs]
-        (.add collector (Tuple. (into-array Object [k v])))))
+        (.add collector (to-tuple [k v]))))
     src))
 
 (defn connect
   "Connect the supplied source and sink with the supplied pipe."
   [pipe source sink]
-  (doto (.connect (FlowConnector. props) source sink pipe)
+  (doto (.connect (HadoopFlowConnector. props) source sink pipe)
     (.complete)))
 
 (defn elephant->hfs
@@ -82,15 +88,18 @@
   "Returns all tuples in the supplied cascading tap as a Clojure
   sequence."
   [sink]
-  (with-open [it (.openForRead sink (jobconf))]
+  (with-open [it (-> (HadoopFlowProcess. (jobconf))
+                     (.openTapForRead sink))]
     (doall (for [wrapper (iterator-seq it)]
              (into [] (.getTuple wrapper))))))
 
 (deftest connect-test
   (are [xs]
-       (with-fs-tmp [_ src-tmp sink-tmp]     
-         (let [sink (ElephantDBTap. sink-tmp
-                                    (DomainSpec. (JavaBerkDB.) (HashModScheme.) 4)
+       (with-fs-tmp [_ tmp]     
+         (let [sink (ElephantDBTap. "/tmp/eden"
+                                    (DomainSpec. (JavaBerkDB.)
+                                                 (HashModScheme.)
+                                                 4)
                                     (mk-options))]
            (fill-domain sink xs)))
        [[1 2] [3 4]]
@@ -175,8 +184,11 @@
                (HashModScheme.)
                4))
 
-(defn populate [idx]
-  (with-open [shard (.createShard spec "/Users/sritchie/Desktop/helper" idx)]
+(defn mk-tap [path]
+  (ElephantDBTap. path spec (mk-options)))
+
+(defn populate [path idx]
+  (with-open [shard (.createShard spec path idx)]
     (doseq [x (range 1000)]
       (.index shard (KeyValDocument. x 10)))))
 
