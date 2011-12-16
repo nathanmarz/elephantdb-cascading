@@ -66,7 +66,8 @@ public class ElephantTailAssembly extends SubAssembly {
         LOG.info("Instantiating spec: " + spec);
 
         // Add the shard index as field #2.
-        Pipe out = new Each(keyValuePairs, new Fields(0), new Shardize(shardField, spec), Fields.ALL);
+        Pipe out =
+            new Each(keyValuePairs, new Fields(0), new Shardize(shardField, spec), Fields.ALL);
 
         // Add the serialized key itself as field #3 for sorting.
         // TODO: Make secondary sorting optional, and come up with a function to generate
