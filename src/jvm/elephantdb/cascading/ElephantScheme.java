@@ -19,8 +19,8 @@ import org.apache.hadoop.mapred.RecordReader;
 
 import java.io.IOException;
 
-public class ElephantScheme extends
-    Scheme<HadoopFlowProcess, JobConf, RecordReader, OutputCollector<IntWritable, BytesWritable>, Object[], Object[]> {
+public class ElephantScheme extends Scheme<HadoopFlowProcess, JobConf, RecordReader,
+    OutputCollector<IntWritable, BytesWritable>, Object[], Object[]> {
 
     PersistenceCoordinator _coordinator;
     IGateway _gateway;
