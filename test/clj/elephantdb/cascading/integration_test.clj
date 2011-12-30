@@ -11,7 +11,7 @@
             PersistenceCoordinator KeyValDocument]
            [elephantdb.store DomainStore]
            [elephantdb DomainSpec Utils]
-           [elephantdb.hadoop IdentityUpdater]
+           [elephantdb.hadoop IdentityIndexer]
            [elephantdb.cascading ElephantDBTap
             ElephantBaseTap$Args ElephantTailAssembly]
            [org.apache.hadoop.io BytesWritable IntWritable]
@@ -24,9 +24,9 @@
 (defn kv-tap [path]
   (hfs-tap path "key" "value"))
 
-(defn mk-options [& {:keys [updater]}]
+(defn mk-options [& {:keys [indexer]}]
   (let [ret (ElephantBaseTap$Args.)]
-    (set! (.updater ret) updater)
+    (set! (.indexer ret) indexer)
     ret))
 
 (def props
@@ -123,7 +123,7 @@
 ;; about here is getting data in and out of edb w/ cascading.
 (def-fs-test test-basic [fs tmp]
   (let [spec (DomainSpec. (JavaBerkDB.) (HashModScheme.) 4)
-        sink (ElephantDBTap. tmp spec (mk-options :updater nil))
+        sink (ElephantDBTap. tmp spec (mk-options :indexer nil))
         data [[0 (barr 0 0)]
               [1 (barr 1 1)]
               [2 (barr 2 2)]
@@ -145,7 +145,7 @@
 ;; about here is getting data in and out of edb w/ cascading.
 (def-fs-test test-incremental [fs tmp]
   (let [spec (DomainSpec. (JavaBerkDB.) (HashModScheme.) 2)
-        sink (ElephantDBTap. tmp spec (mk-options (IdentityUpdater.)))
+        sink (ElephantDBTap. tmp spec (mk-options (IdentityIndexer.)))
         data [[(barr 0) (barr 0 0)]
               [(barr 1) (barr 1 1)]
               [(barr 2) (barr 2 2)]]

@@ -10,6 +10,9 @@ import cascading.tuple.Fields;
 import elephantdb.DomainSpec;
 import elephantdb.Utils;
 import elephantdb.hadoop.*;
+import elephantdb.index.IdentityIndexer;
+import elephantdb.index.Indexer;
+import elephantdb.persistence.PersistenceCoordinator;
 import elephantdb.store.DomainStore;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapred.FileInputFormat;
@@ -23,7 +26,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.UUID;
 
-public abstract class ElephantBaseTap<G extends IGateway> extends Hfs implements FlowListener {
+public abstract class ElephantBaseTap<G extends IGateway> extends Hfs {
 
     public static final Logger LOG = Logger.getLogger(ElephantBaseTap.class);
 
@@ -39,7 +42,7 @@ public abstract class ElephantBaseTap<G extends IGateway> extends Hfs implements
 
         //sink specific
         public Fields sinkFields = Fields.ALL;
-        public ElephantUpdater updater = new IdentityUpdater();
+        public Indexer indexer = new IdentityIndexer();
 
     }
 
@@ -54,8 +57,8 @@ public abstract class ElephantBaseTap<G extends IGateway> extends Hfs implements
         _spec = new DomainStore(dir, spec).getSpec();
 
         setStringPath(_domainDir);
-        setScheme(new ElephantScheme(
-            _args.sourceFields, _args.sinkFields, _spec.getCoordinator(), freshGateway()));
+        PersistenceCoordinator coord = (PersistenceCoordinator) _spec.getCoordinator();
+        setScheme(new ElephantScheme(_args.sourceFields, _args.sinkFields, coord, freshGateway()));
     }
 
     public abstract G freshGateway();
@@ -117,8 +120,8 @@ public abstract class ElephantBaseTap<G extends IGateway> extends Hfs implements
         if (_args.tmpDirs != null) {
             LocalElephantManager.setTmpDirs(conf, _args.tmpDirs);
         }
-        if (_args.updater != null) {
-            eargs.updater = _args.updater;
+        if (_args.indexer != null) {
+            eargs.indexer = _args.indexer;
             eargs.updateDirHdfs = dstore.mostRecentVersionPath();
         }
 
@@ -165,13 +168,18 @@ public abstract class ElephantBaseTap<G extends IGateway> extends Hfs implements
         return false;
     }
 
+    // TODO: Move guts of onCompleted over to commitResource.
+    @Override public boolean commitResource(JobConf conf) {
+        return true;
+    }
+
     public void onCompleted(Flow flow) {
         try {
             if (isSinkOf(flow)) {
                 DomainStore domainStore = getDomainStore();
                 if (flow.getFlowStats().isSuccessful()) {
                     domainStore.getFileSystem().mkdirs(new Path(_newVersionPath));
-                    if (_args.updater != null) {
+                    if (_args.indexer != null) {
                         domainStore.synchronizeInProgressVersion(_newVersionPath);
                     }
                     domainStore.succeedVersion(_newVersionPath);
