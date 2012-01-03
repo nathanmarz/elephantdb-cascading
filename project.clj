@@ -1,5 +1,6 @@
 (defproject elephantdb/elephantdb-cascading "0.2.0"
   :java-source-path "src/jvm"
+  :source-path "src/clj"
   :javac-options {:debug "true" :fork "true"}
   :repositories {"conjars" "http://conjars.org/repo"}
   :dependencies [[elephantdb "0.2.0"]
