@@ -7,10 +7,10 @@ import cascading.scheme.SourceCall;
 import cascading.tap.Tap;
 import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
+import elephantdb.DomainSpec;
 import elephantdb.Utils;
 import elephantdb.hadoop.ElephantInputFormat;
 import elephantdb.hadoop.ElephantOutputFormat;
-import elephantdb.persistence.PersistenceCoordinator;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.NullWritable;
@@ -23,15 +23,18 @@ import java.io.IOException;
 public class ElephantScheme extends Scheme<HadoopFlowProcess, JobConf,
     RecordReader, OutputCollector, Object[], Object[]> {
 
-    PersistenceCoordinator _coordinator;
-    IGateway _gateway;
+    Serializer serializer;
+    IGateway gateway;
 
-    public ElephantScheme(Fields sourceFields, Fields sinkFields,
-        PersistenceCoordinator coordinator, IGateway gateway) {
+    public ElephantScheme(Fields sourceFields, Fields sinkFields, DomainSpec spec, IGateway gateway) {
         setSourceFields(sourceFields);
         setSinkFields(sinkFields);
-        _coordinator = coordinator;
-        _gateway = gateway;
+        this.serializer = Utils.makeSerializer(spec);
+        this.gateway = gateway;
+    }
+
+    public Serializer getSerializer() {
+        return serializer;
     }
 
     @Override
@@ -69,9 +72,9 @@ public class ElephantScheme extends Scheme<HadoopFlowProcess, JobConf,
         }
 
         byte[] valBytes = Utils.getBytes(value);
-        Object doc = _coordinator.getKryoBuffer().deserialize(valBytes);
+        Object doc = serializer.deserialize(valBytes);
 
-        sourceCall.getIncomingEntry().setTuple(_gateway.buildTuple(doc));
+        sourceCall.getIncomingEntry().setTuple(gateway.buildTuple(doc));
         return true;
     }
 
@@ -80,9 +83,9 @@ public class ElephantScheme extends Scheme<HadoopFlowProcess, JobConf,
         Tuple tuple = sinkCall.getOutgoingEntry().getTuple();
 
         int shard = tuple.getInteger(0);
-        Object doc = _gateway.buildDocument(tuple);
+        Object doc = gateway.buildDocument(tuple);
 
-        byte[] crushedDocument = _coordinator.getKryoBuffer().serialize(doc);
+        byte[] crushedDocument = serializer.serialize(doc);
         sinkCall.getOutput().collect(new IntWritable(shard), new BytesWritable(crushedDocument));
     }
 }

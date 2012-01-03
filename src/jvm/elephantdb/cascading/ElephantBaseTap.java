@@ -1,7 +1,6 @@
 package elephantdb.cascading;
 
 import cascading.flow.Flow;
-import cascading.flow.FlowListener;
 import cascading.flow.hadoop.HadoopFlowProcess;
 import cascading.tap.Tap;
 import cascading.tap.TapException;
@@ -12,7 +11,6 @@ import elephantdb.Utils;
 import elephantdb.hadoop.*;
 import elephantdb.index.IdentityIndexer;
 import elephantdb.index.Indexer;
-import elephantdb.persistence.PersistenceCoordinator;
 import elephantdb.store.DomainStore;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapred.FileInputFormat;
@@ -43,32 +41,31 @@ public abstract class ElephantBaseTap<G extends IGateway> extends Hfs {
         //sink specific
         public Fields sinkFields = Fields.ALL;
         public Indexer indexer = new IdentityIndexer();
-
     }
 
-    String _domainDir;
-    DomainSpec _spec;
-    Args _args;
-    String _newVersionPath;
+    String domainDir;
+    DomainSpec spec;
+    Args args;
+    String newVersionPath;
 
     public ElephantBaseTap(String dir, DomainSpec spec, Args args) throws IOException {
-        _domainDir = dir;
-        _args = args;
-        _spec = new DomainStore(dir, spec).getSpec();
+        domainDir = dir;
+        this.args = args;
+        this.spec = new DomainStore(dir, spec).getSpec();
 
-        setStringPath(_domainDir);
-        PersistenceCoordinator coord = (PersistenceCoordinator) _spec.getCoordinator();
-        setScheme(new ElephantScheme(_args.sourceFields, _args.sinkFields, coord, freshGateway()));
+        setStringPath(domainDir);
+        setScheme(new ElephantScheme(this.args.sourceFields,
+            this.args.sinkFields, this.spec, freshGateway()));
     }
 
     public abstract G freshGateway();
 
     public DomainStore getDomainStore() throws IOException {
-        return new DomainStore(_domainDir, _spec);
+        return new DomainStore(domainDir, spec);
     }
 
     public DomainSpec getSpec() {
-        return _spec;
+        return spec;
     }
 
     @Override public void sourceConfInit(HadoopFlowProcess process, JobConf conf) {
@@ -76,18 +73,18 @@ public abstract class ElephantBaseTap<G extends IGateway> extends Hfs {
 
         FileInputFormat.setInputPaths(conf, "/" + UUID.randomUUID().toString());
 
-        ElephantInputFormat.Args eargs = new ElephantInputFormat.Args(_domainDir);
-        eargs.inputDirHdfs = _domainDir;
-        if (_args.persistenceOptions != null) {
-            eargs.persistenceOptions = _args.persistenceOptions;
+        ElephantInputFormat.Args eargs = new ElephantInputFormat.Args(domainDir);
+        eargs.inputDirHdfs = domainDir;
+        if (args.persistenceOptions != null) {
+            eargs.persistenceOptions = args.persistenceOptions;
         }
-        if (_args.tmpDirs != null) {
-            LocalElephantManager.setTmpDirs(conf, _args.tmpDirs);
+        if (args.tmpDirs != null) {
+            LocalElephantManager.setTmpDirs(conf, args.tmpDirs);
         }
 
-        eargs.version = _args.version;
+        eargs.version = args.version;
 
-        conf.setInt("mapred.task.timeout", _args.timeoutMs);
+        conf.setInt("mapred.task.timeout", args.timeoutMs);
         Utils.setObject(conf, ElephantInputFormat.ARGS_CONF, eargs);
     }
 
@@ -103,25 +100,25 @@ public abstract class ElephantBaseTap<G extends IGateway> extends Hfs {
 
         // serialize this particular argument off into the JobConf.
         Utils.setObject(conf, ElephantOutputFormat.ARGS_CONF, args);
-        conf.setInt("mapred.task.timeout", _args.timeoutMs);
+        conf.setInt("mapred.task.timeout", this.args.timeoutMs);
         conf.setBoolean("mapred.reduce.tasks.speculative.execution", false);
-        conf.setInt("mapred.reduce.tasks", _spec.getNumShards());
+        conf.setInt("mapred.reduce.tasks", spec.getNumShards());
     }
 
     public ElephantOutputFormat.Args outputArgs(JobConf conf) throws IOException {
         DomainStore dstore = getDomainStore();
-        if (_newVersionPath == null) { //working around cascading calling sinkinit twice
-            _newVersionPath = dstore.createVersion();
+        if (newVersionPath == null) { //working around cascading calling sinkinit twice
+            newVersionPath = dstore.createVersion();
         }
-        ElephantOutputFormat.Args eargs = new ElephantOutputFormat.Args(_spec, _newVersionPath);
-        if (_args.persistenceOptions != null) {
-            eargs.persistenceOptions = _args.persistenceOptions;
+        ElephantOutputFormat.Args eargs = new ElephantOutputFormat.Args(spec, newVersionPath);
+        if (args.persistenceOptions != null) {
+            eargs.persistenceOptions = args.persistenceOptions;
         }
-        if (_args.tmpDirs != null) {
-            LocalElephantManager.setTmpDirs(conf, _args.tmpDirs);
+        if (args.tmpDirs != null) {
+            LocalElephantManager.setTmpDirs(conf, args.tmpDirs);
         }
-        if (_args.indexer != null) {
-            eargs.indexer = _args.indexer;
+        if (args.indexer != null) {
+            eargs.indexer = args.indexer;
             eargs.updateDirHdfs = dstore.mostRecentVersionPath();
         }
 
@@ -130,7 +127,7 @@ public abstract class ElephantBaseTap<G extends IGateway> extends Hfs {
 
     @Override
     public Path getPath() {
-        return new Path(_domainDir);
+        return new Path(domainDir);
     }
 
     @Override
@@ -178,19 +175,19 @@ public abstract class ElephantBaseTap<G extends IGateway> extends Hfs {
             if (isSinkOf(flow)) {
                 DomainStore domainStore = getDomainStore();
                 if (flow.getFlowStats().isSuccessful()) {
-                    domainStore.getFileSystem().mkdirs(new Path(_newVersionPath));
-                    if (_args.indexer != null) {
-                        domainStore.synchronizeInProgressVersion(_newVersionPath);
+                    domainStore.getFileSystem().mkdirs(new Path(newVersionPath));
+                    if (args.indexer != null) {
+                        domainStore.synchronizeInProgressVersion(newVersionPath);
                     }
-                    domainStore.succeedVersion(_newVersionPath);
+                    domainStore.succeedVersion(newVersionPath);
                 } else {
-                    domainStore.failVersion(_newVersionPath);
+                    domainStore.failVersion(newVersionPath);
                 }
             }
         } catch (IOException e) {
             throw new TapException("Couldn't finalize new elephant domain version", e);
         } finally {
-            _newVersionPath = null; //working around cascading calling sinkConfInit twice
+            newVersionPath = null; //working around cascading calling sinkConfInit twice
         }
     }
 

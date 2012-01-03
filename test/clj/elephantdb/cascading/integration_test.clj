@@ -7,8 +7,7 @@
            [cascading.tuple Fields Tuple]
            [cascading.flow.hadoop HadoopFlowProcess HadoopFlowConnector]
            [cascading.tap.hadoop Hfs]
-           [elephantdb.persistence JavaBerkDB HashModScheme
-            PersistenceCoordinator KeyValDocument]
+           [elephantdb.persistence JavaBerkDB HashModScheme KeyValDocument]
            [elephantdb.store DomainStore]
            [elephantdb DomainSpec Utils]
            [elephantdb.hadoop IdentityIndexer]

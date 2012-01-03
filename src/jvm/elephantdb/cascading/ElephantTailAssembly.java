@@ -12,7 +12,8 @@ import cascading.pipe.SubAssembly;
 import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
 import elephantdb.DomainSpec;
-import elephantdb.persistence.KryoWrapper;
+import elephantdb.Utils;
+import elephantdb.persistence.ShardingScheme;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.log4j.Logger;
 
@@ -22,33 +23,38 @@ public class ElephantTailAssembly extends SubAssembly {
     public static Logger LOG = Logger.getLogger(ElephantTailAssembly.class);
 
     public static class Shardize extends BaseOperation implements Function {
-        DomainSpec _spec;
+        ShardingScheme shardScheme;
+        int shardCount;
 
         public Shardize(String outfield, DomainSpec spec) {
             super(new Fields(outfield));
-            _spec = spec;
+            shardScheme = spec.getShardScheme();
+            shardCount = spec.getNumShards();
+        }
+        
+        public int shardIndex(Object key) {
+            return shardScheme.shardIndex(key, shardCount);
         }
 
         public void operate(FlowProcess process, FunctionCall call) {
             Object key = call.getArguments().getObject(0);
-            int shard = _spec.shardIndex(key);
+
+            int shard = shardIndex(key);
             call.getOutputCollector().add(new Tuple(shard));
         }
     }
 
     public static class MakeSortableKey extends BaseOperation implements Function {
-        DomainSpec _spec;
-        KryoWrapper.KryoBuffer _kryoBuf;
+        Serializer serializer;
 
         public MakeSortableKey(String outfield, DomainSpec spec) {
             super(new Fields(outfield));
-            _spec = spec;
-            _kryoBuf = _spec.getCoordinator().getKryoBuffer();
+            serializer = Utils.makeSerializer(spec);
         }
 
         public void operate(FlowProcess process, FunctionCall call) {
             Object key = call.getArguments().getObject(0);
-            BytesWritable sortField = new BytesWritable(_kryoBuf.serialize(key));
+            BytesWritable sortField = new BytesWritable(serializer.serialize(key));
             call.getOutputCollector().add(new Tuple(sortField));
         }
     }
