@@ -91,6 +91,8 @@ public abstract class ElephantBaseTap<G extends IGateway> extends Hfs implements
     }
 
     @Override public void sinkInit(JobConf conf) throws IOException {
+        super.sinkInit(conf);
+
         ElephantOutputFormat.Args args = outputArgs(conf);
 
         // serialize this particular argument off into the JobConf.
@@ -102,6 +104,7 @@ public abstract class ElephantBaseTap<G extends IGateway> extends Hfs implements
 
     public ElephantOutputFormat.Args outputArgs(JobConf conf) throws IOException {
         DomainStore dstore = getDomainStore();
+
         if (newVersionPath == null) { //working around cascading calling sinkinit twice
             newVersionPath = dstore.createVersion();
         }
@@ -155,7 +158,8 @@ public abstract class ElephantBaseTap<G extends IGateway> extends Hfs implements
 
     private boolean isSinkOf(Flow flow) {
         for (Entry<String, Tap> e : flow.getSinks().entrySet()) {
-            if (e.getValue() == this) { return true; }
+            if (e.getValue() == this)
+                return true;
         }
         return false;
     }

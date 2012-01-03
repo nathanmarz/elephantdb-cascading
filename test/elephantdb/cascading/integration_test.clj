@@ -26,9 +26,9 @@
 (defn kv-tap [path]
   (hfs-tap path "key" "value"))
 
-(defn mk-options [& {:keys [updater]}]
+(defn mk-options [& {:keys [indexer]}]
   (let [ret (ElephantBaseTap$Args.)]
-    (set! (.updater ret) updater)
+    (set! (.indexer ret) indexer)
     ret))
 
 (def props
@@ -119,7 +119,7 @@
 (deftest test-basic
   (with-fs-tmp [fs tmp]
     (let [spec (DomainSpec. (JavaBerkDB.) (HashModScheme.) 4)
-          sink (ElephantDBTap. tmp spec (mk-options :updater nil))
+          sink (ElephantDBTap. tmp spec (mk-options :indexer nil))
           data [[0 (barr 0 0)]
                 [1 (barr 1 1)]
                 [2 (barr 2 2)]

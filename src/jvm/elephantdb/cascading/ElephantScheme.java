@@ -30,7 +30,6 @@ public class ElephantScheme extends Scheme {
 
     @Override
     public void sourceInit(Tap tap, JobConf conf) throws IOException {
-        conf.setOutputValueClass( BytesWritable.class ); // be explicit
         conf.setInputFormat(ElephantInputFormat.class);
     }
 
