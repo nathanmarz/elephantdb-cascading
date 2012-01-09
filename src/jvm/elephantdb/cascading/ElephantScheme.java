@@ -11,6 +11,7 @@ import elephantdb.DomainSpec;
 import elephantdb.Utils;
 import elephantdb.hadoop.ElephantInputFormat;
 import elephantdb.hadoop.ElephantOutputFormat;
+import elephantdb.serialize.Serializer;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.NullWritable;
@@ -20,9 +21,7 @@ import org.apache.hadoop.mapred.RecordReader;
 
 import java.io.IOException;
 
-public class ElephantScheme extends Scheme<HadoopFlowProcess, JobConf,
-    RecordReader, OutputCollector, Object[], Object[]> {
-
+public class ElephantScheme extends Scheme<HadoopFlowProcess, JobConf, RecordReader, OutputCollector, Object[], Object[]> {
     Serializer serializer;
     IGateway gateway;
 
@@ -39,13 +38,11 @@ public class ElephantScheme extends Scheme<HadoopFlowProcess, JobConf,
 
     @Override
     public void sourceConfInit(HadoopFlowProcess flowProcess, Tap tap, JobConf conf) {
-        conf.setOutputValueClass( BytesWritable.class ); // be explicit
         conf.setInputFormat(ElephantInputFormat.class);
     }
 
-    @Override
-    public void sinkConfInit(HadoopFlowProcess flowProcess, Tap tap, JobConf conf) {
-        conf.setOutputKeyClass( IntWritable.class ); // be explicit
+    @Override public void sinkConfInit(HadoopFlowProcess flowProcess, Tap tap, JobConf conf) {
+        conf.setOutputKeyClass(IntWritable.class); // be explicit
         conf.setOutputValueClass( BytesWritable.class ); // be explicit
         conf.setOutputFormat(ElephantOutputFormat.class);
     }
@@ -72,7 +69,7 @@ public class ElephantScheme extends Scheme<HadoopFlowProcess, JobConf,
         }
 
         byte[] valBytes = Utils.getBytes(value);
-        Object doc = serializer.deserialize(valBytes);
+        Object doc = getSerializer().deserialize(valBytes);
 
         sourceCall.getIncomingEntry().setTuple(gateway.buildTuple(doc));
         return true;
@@ -82,10 +79,11 @@ public class ElephantScheme extends Scheme<HadoopFlowProcess, JobConf,
         SinkCall<Object[], OutputCollector> sinkCall) throws IOException {
         Tuple tuple = sinkCall.getOutgoingEntry().getTuple();
 
+
         int shard = tuple.getInteger(0);
         Object doc = gateway.buildDocument(tuple);
 
-        byte[] crushedDocument = serializer.serialize(doc);
+        byte[] crushedDocument = getSerializer().serialize(doc);
         sinkCall.getOutput().collect(new IntWritable(shard), new BytesWritable(crushedDocument));
     }
 }

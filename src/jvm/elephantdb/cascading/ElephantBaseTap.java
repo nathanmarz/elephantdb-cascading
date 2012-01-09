@@ -1,6 +1,7 @@
 package elephantdb.cascading;
 
 import cascading.flow.Flow;
+import cascading.flow.FlowListener;
 import cascading.flow.hadoop.HadoopFlowProcess;
 import cascading.tap.Tap;
 import cascading.tap.TapException;
@@ -8,7 +9,9 @@ import cascading.tap.hadoop.Hfs;
 import cascading.tuple.Fields;
 import elephantdb.DomainSpec;
 import elephantdb.Utils;
-import elephantdb.hadoop.*;
+import elephantdb.hadoop.ElephantInputFormat;
+import elephantdb.hadoop.ElephantOutputFormat;
+import elephantdb.hadoop.LocalElephantManager;
 import elephantdb.index.IdentityIndexer;
 import elephantdb.index.Indexer;
 import elephantdb.store.DomainStore;
@@ -24,8 +27,8 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.UUID;
 
-public abstract class ElephantBaseTap<G extends IGateway> extends Hfs {
 
+public abstract class ElephantBaseTap<G extends IGateway> extends Hfs implements FlowListener {
     public static final Logger LOG = Logger.getLogger(ElephantBaseTap.class);
 
     public static class Args implements Serializable {
@@ -54,8 +57,7 @@ public abstract class ElephantBaseTap<G extends IGateway> extends Hfs {
         this.spec = new DomainStore(dir, spec).getSpec();
 
         setStringPath(domainDir);
-        setScheme(new ElephantScheme(this.args.sourceFields,
-            this.args.sinkFields, this.spec, freshGateway()));
+        setScheme(new ElephantScheme(this.args.sourceFields, this.args.sinkFields, this.spec, freshGateway()));
     }
 
     public abstract G freshGateway();
@@ -77,6 +79,7 @@ public abstract class ElephantBaseTap<G extends IGateway> extends Hfs {
         eargs.inputDirHdfs = domainDir;
         if (args.persistenceOptions != null) {
             eargs.persistenceOptions = args.persistenceOptions;
+
         }
         if (args.tmpDirs != null) {
             LocalElephantManager.setTmpDirs(conf, args.tmpDirs);
@@ -107,6 +110,7 @@ public abstract class ElephantBaseTap<G extends IGateway> extends Hfs {
 
     public ElephantOutputFormat.Args outputArgs(JobConf conf) throws IOException {
         DomainStore dstore = getDomainStore();
+
         if (newVersionPath == null) { //working around cascading calling sinkinit twice
             newVersionPath = dstore.createVersion();
         }
@@ -158,9 +162,8 @@ public abstract class ElephantBaseTap<G extends IGateway> extends Hfs {
 
     private boolean isSinkOf(Flow<JobConf> flow) {
         for (Entry<String, Tap> e : flow.getSinks().entrySet()) {
-            if (e.getValue() == this) {
+            if (e.getValue() == this)
                 return true;
-            }
         }
         return false;
     }

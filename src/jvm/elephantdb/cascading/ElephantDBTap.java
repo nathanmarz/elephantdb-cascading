@@ -4,8 +4,12 @@ import elephantdb.DomainSpec;
 
 import java.io.IOException;
 
+<<<<<<< HEAD
 public class ElephantDBTap extends ElephantBaseTap<KeyValGateway> {
 
+=======
+public class ElephantDBTap extends ElephantBaseTap {
+>>>>>>> develop
     public ElephantDBTap(String dir, Args args) throws IOException {
         this(dir, null, args);
     }

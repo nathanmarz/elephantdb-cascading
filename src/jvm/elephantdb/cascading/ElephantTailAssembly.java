@@ -13,7 +13,8 @@ import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
 import elephantdb.DomainSpec;
 import elephantdb.Utils;
-import elephantdb.persistence.ShardingScheme;
+import elephantdb.partition.ShardingScheme;
+import elephantdb.serialize.Serializer;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.log4j.Logger;
 
@@ -31,7 +32,7 @@ public class ElephantTailAssembly extends SubAssembly {
             shardScheme = spec.getShardScheme();
             shardCount = spec.getNumShards();
         }
-        
+
         public int shardIndex(Object key) {
             return shardScheme.shardIndex(key, shardCount);
         }

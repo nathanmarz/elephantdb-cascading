@@ -28,4 +28,3 @@ public class EDBSearchTap extends ElephantBaseTap<IdentityGateway> {
         return new IdentityGateway();
     }
 }
-

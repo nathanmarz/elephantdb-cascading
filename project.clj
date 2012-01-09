@@ -1,6 +1,7 @@
 (defproject elephantdb/elephantdb-cascading "0.3.0"
   :source-path "src/clj"
   :java-source-path "src/jvm"
+<<<<<<< HEAD
   :test-path "test/clj"
   :javac-options {:debug "true" :fork "true"}
   :repositories {"conjars" "http://conjars.org/repo"}
@@ -10,3 +11,14 @@
                   :exclusions [org.codehaus.janino/janino
                                org.apache.hadoop/hadoop-core]]]
   :dev-dependencies [[org.apache.hadoop/hadoop-core "0.20.2-dev"]])
+=======
+  :source-path "src/clj"
+  :javac-options {:debug "true" :fork "true"}
+  :repositories {"conjars" "http://conjars.org/repo"}
+  :dependencies [[elephantdb "0.2.0"]
+                 [cascading/cascading-core "1.2.4"
+                  :exclusions [org.codehaus.janino/janino]]]
+  :dev-dependencies [[org.clojure/clojure "1.3.0"]
+                     [org.apache.hadoop/hadoop-core "0.20.2-dev"]
+                     [midje "1.3.0"]])
+>>>>>>> develop

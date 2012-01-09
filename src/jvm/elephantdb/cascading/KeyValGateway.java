@@ -1,7 +1,7 @@
 package elephantdb.cascading;
 
 import cascading.tuple.Tuple;
-import elephantdb.persistence.KeyValDocument;
+import elephantdb.document.KeyValDocument;
 
 /** User: sritchie Date: 12/16/11 Time: 12:08 AM */
 public class KeyValGateway implements IGateway<KeyValDocument> {
