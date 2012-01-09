@@ -12,3 +12,4 @@ elephantdb-cascading.iml
 *.iml
 *.ipr
 *.iws
+.DS_Store
