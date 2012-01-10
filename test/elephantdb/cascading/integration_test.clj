@@ -2,7 +2,7 @@
   (:use midje.sweet
         elephantdb.test.common
         [clojure.string :only (join)])
-  (:require [elephantdb.keyval.testing :as t])
+  (:require [elephantdb.test.keyval :as t])
   (:import [cascading.pipe Pipe]
            [cascading.tuple Fields Tuple]
            [cascading.flow FlowConnector]
