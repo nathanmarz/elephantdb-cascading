@@ -1,7 +1,6 @@
 (ns elephantdb.cascading.integration-test
-  (:use clojure.test
-        midje.sweet
-        elephantdb.common.testing
+  (:use midje.sweet
+        elephantdb.test.common
         [clojure.string :only (join)])
   (:require [elephantdb.keyval.testing :as t])
   (:import [cascading.pipe Pipe]
@@ -96,17 +95,16 @@
     (doall (for [wrapper (iterator-seq it)]
              (into [] (.getTuple wrapper))))))
 
-(deftest connect-test
-  (are [xs]
-       (with-fs-tmp [_ tmp]     
-         (let [sink (ElephantDBTap. "/tmp/eden"
-                                    (DomainSpec. (JavaBerkDB.)
-                                                 (HashModScheme.)
-                                                 4)
-                                    (mk-options))]
-           (fill-domain sink xs)))
-       [[1 2] [3 4]]
-       [["key" "val"] ["ham" "burger"]]))
+(tabular
+ (fact "connect-test"
+   (with-fs-tmp [_ src-tmp sink-tmp]     
+     (let [sink (ElephantDBTap. sink-tmp
+                                (DomainSpec. (JavaBerkDB.) (HashModScheme.) 4)
+                                (mk-options))]
+       (fill-domain sink ?xs))))
+ ?xs
+ [[1 2] [3 4]]
+ [["key" "val"] ["ham" "burger"]])
 
 (defn read-etap-with-flow [path]
   (with-fs-tmp [fs tmp-path]
@@ -118,13 +116,12 @@
 (defn check-results
   "TODO: Move over to edb proper."
   [dpath pairs]
-  (is (= (set (read-etap-with-flow dpath))
-         (set pairs))))
+  (fact pairs => (just (read-etap-with-flow dpath) :in-any-order)))
 
 ;; TODO: Invalid. Doesn't belong in this project; this makes far too
 ;; many assumptions about a thrift interface, etc. All we're concerned
 ;; about here is getting data in and out of edb w/ cascading.
-(deftest test-basic
+(fact "test basic"
   (with-fs-tmp [fs tmp]
     (let [spec (DomainSpec. (JavaBerkDB.) (HashModScheme.) 4)
           sink (ElephantDBTap. tmp spec (mk-options :indexer nil))
@@ -147,7 +144,7 @@
 ;; TODO: Invalid. Doesn't belong in this project; this makes far too
 ;; many assumptions about a thrift interface, etc. All we're concerned
 ;; about here is getting data in and out of edb w/ cascading.
-(deftest test-incremental
+(fact "test-incremental"
   (with-fs-tmp [fs tmp]
     (let [spec (DomainSpec. (JavaBerkDB.) (HashModScheme.) 2)
           sink (ElephantDBTap. tmp spec (mk-options (IdentityIndexer.)))
@@ -165,7 +162,7 @@
       (fill-domain sink data2)
       (check-results tmp data3))))
 
-(deftest test-source
+(fact "test-source"
   (with-fs-tmp [fs tmp]
     (let [pairs [[(barr 0) (barr 0 2)]
                  [(barr 1) (barr 1 1)]
@@ -182,7 +179,8 @@
                               {:num-shards 6
                                :persistence-factory (JavaBerkDB.)}
                               pairs]
-        (is (t/kv-pairs= pairs (read-etap-with-flow dpath)))))))
+        (fact
+          (t/kv-pairs= pairs (read-etap-with-flow dpath)) => true)))))
 
 ;; Example of how to do stuff now.
 (def spec
@@ -193,8 +191,8 @@
 (defn mk-tap [path]
   (ElephantDBTap. path spec (mk-options)))
 
-(defn populate [path idx]
-  (with-open [shard (.createShard spec path idx)]
+(defn populate [root idx]
+  (with-open [shard (.createShard spec root idx)]
     (doseq [x (range 1000)]
       (.index shard (KeyValDocument. x 10)))))
 
@@ -204,8 +202,8 @@
     (doall (iterator-seq iter))))
 
 ;; or, you can create a domain store directly:
-(def store
-  (DomainStore. "/Users/sritchie/Desktop/helper"
-                (DomainSpec. (JavaBerkDB.)
-                             (HashModScheme.)
-                             4)))
+(defn store []
+  (with-fs-tmp [_ tmp]
+    (DomainStore. tmp (DomainSpec. (JavaBerkDB.)
+                                   (HashModScheme.)
+                                   4))))
