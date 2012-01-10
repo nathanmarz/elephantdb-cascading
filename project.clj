@@ -4,6 +4,7 @@
   :javac-options {:debug "true" :fork "true"}
   :repositories {"conjars" "http://conjars.org/repo"}
   :dependencies [[elephantdb "0.2.0"]
+                 [hadoop-util "0.2.7"]
                  [cascading/cascading-hadoop "2.0.0-wip-184"
                   :exclusions [org.codehaus.janino/janino
                                org.apache.hadoop/hadoop-core]]]
