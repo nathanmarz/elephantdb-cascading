@@ -2,7 +2,8 @@
   (:use midje.sweet
         elephantdb.test.common
         [clojure.string :only (join)])
-  (:require [elephantdb.test.keyval :as t])
+  (:require [elephantdb.test.keyval :as t]
+            [hadoop-util.test :as test])
   (:import [cascading.pipe Pipe]
            [cascading.tuple Fields Tuple]
            [cascading.flow FlowConnector]
@@ -77,7 +78,7 @@
   "Fills the supplied elephant-sink with the the supplied sequence of
   kv-pairs."
   [elephant-sink pairs]
-  (with-fs-tmp [_ tmp]
+  (test/with-fs-tmp [_ tmp]
     (-> (create-source tmp pairs)
         (hfs->elephant elephant-sink))))
 
@@ -91,7 +92,7 @@
 
 (tabular
  (fact "connect-test"
-   (with-fs-tmp [_ src-tmp sink-tmp]     
+   (test/with-fs-tmp [_ src-tmp sink-tmp]     
      (let [sink (ElephantDBTap. sink-tmp
                                 (DomainSpec. (JavaBerkDB.) (HashModScheme.) 4)
                                 (mk-options))]
@@ -101,7 +102,7 @@
  [["key" "val"] ["ham" "burger"]])
 
 (defn read-etap-with-flow [path]
-  (with-fs-tmp [fs tmp-path]
+  (test/with-fs-tmp [fs tmp-path]
     (let [source (ElephantDBTap. path)
           sink (kv-tap tmp-path)]
       (elephant->hfs source sink)
@@ -116,7 +117,7 @@
 ;; many assumptions about a thrift interface, etc. All we're concerned
 ;; about here is getting data in and out of edb w/ cascading.
 (fact "test basic"
-  (with-fs-tmp [fs tmp]
+  (test/with-fs-tmp [fs tmp]
     (let [spec (DomainSpec. (JavaBerkDB.) (HashModScheme.) 4)
           sink (ElephantDBTap. tmp spec (mk-options :indexer nil))
           data [[0 (barr 0 0)]
@@ -139,7 +140,7 @@
 ;; many assumptions about a thrift interface, etc. All we're concerned
 ;; about here is getting data in and out of edb w/ cascading.
 (fact "test-incremental"
-  (with-fs-tmp [fs tmp]
+  (test/with-fs-tmp [fs tmp]
     (let [spec (DomainSpec. (JavaBerkDB.) (HashModScheme.) 2)
           sink (ElephantDBTap. tmp spec (mk-options (IdentityIndexer.)))
           data [[(barr 0) (barr 0 0)]
@@ -157,7 +158,7 @@
       (check-results tmp data3))))
 
 (fact "test-source"
-  (with-fs-tmp [fs tmp]
+  (test/with-fs-tmp [fs tmp]
     (let [pairs [[(barr 0) (barr 0 2)]
                  [(barr 1) (barr 1 1)]
                  [(barr 2) (barr 9 1)]
@@ -189,7 +190,7 @@
 
 ;; or, you can create a domain store directly:
 (defn store []
-  (with-fs-tmp [_ tmp]
+  (test/with-fs-tmp [_ tmp]
     (DomainStore. tmp (DomainSpec. (JavaBerkDB.)
                                    (HashModScheme.)
                                    4))))
