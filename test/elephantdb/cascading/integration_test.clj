@@ -117,7 +117,7 @@
 (defn check-results
   "TODO: Move over to edb proper."
   [dpath pairs]
-  (fact pairs => (just (read-etap-with-flow dpath) :in-any-order)))
+  (fact (read-etap-with-flow dpath) => (just pairs :in-any-order)))
 
 ;; TODO: Invalid. Doesn't belong in this project; this makes far too
 ;; many assumptions about a thrift interface, etc. All we're concerned
@@ -126,17 +126,17 @@
   (test/with-fs-tmp [fs tmp]
     (let [spec (DomainSpec. (JavaBerkDB.) (HashModScheme.) 4)
           sink (ElephantDBTap. tmp spec (mk-options :indexer nil))
-          data [[0 (barr 0 0)]
-                [1 (barr 1 1)]
-                [2 (barr 2 2)]
-                [3 (barr 3 3)]
-                [4 (barr 4 4)]
-                [5 (barr 5 5)]
-                [6 (barr 6 5)]
-                [7 (barr 7 5)]
-                [8 (barr 8 5)]]
-          data2 [[0 (barr 1)
-                  10 (barr 100)]]]
+          data {0 (barr 0 0)
+                1 (barr 1 1)
+                2 (barr 2 2)
+                3 (barr 3 3)
+                4 (barr 4 4)
+                5 (barr 5 5)
+                6 (barr 6 5)
+                7 (barr 7 5)
+                8 (barr 8 5)}
+          data2 {0 (barr 1)
+                 10 (barr 100)}]
       (fill-domain sink data)
       (check-results tmp data)
       (fill-domain sink data2)
