@@ -64,9 +64,8 @@ public class ElephantScheme extends Scheme<HadoopFlowProcess, JobConf, RecordRea
 
         boolean result = sourceCall.getInput().next(key, value);
 
-        if (!result) {
+        if (!result)
             return false;
-        }
 
         byte[] valBytes = Utils.getBytes(value);
         Object doc = getSerializer().deserialize(valBytes);

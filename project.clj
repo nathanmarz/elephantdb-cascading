@@ -11,4 +11,4 @@
                                org.apache.hadoop/hadoop-core]]]
   :dev-dependencies [[org.apache.hadoop/hadoop-core "0.20.2-dev"]
                      [org.clojure/clojure "1.3.0"]
-                     [midje "1.3.0"]])
+                     [midje "1.3.0" :exclusions [org.clojure/clojure]]])

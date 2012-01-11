@@ -145,11 +145,6 @@ public abstract class ElephantBaseTap<G extends IGateway> extends Hfs implements
     }
 
     @Override
-    public boolean resourceExists(JobConf jc) throws IOException {
-        return false;
-    }
-
-    @Override
     public long getModifiedTime(JobConf jc) throws IOException {
         return System.currentTimeMillis();
     }
