@@ -142,7 +142,7 @@
 (fact "test-incremental"
   (test/with-fs-tmp [fs tmp]
     (let [spec (DomainSpec. (JavaBerkDB.) (HashModScheme.) 2)
-          sink (ElephantDBTap. tmp spec (mk-options (IdentityIndexer.)))
+          sink (ElephantDBTap. tmp spec (mk-options :indexer (IdentityIndexer.)))
           data [[(barr 0) (barr 0 0)]
                 [(barr 1) (barr 1 1)]
                 [(barr 2) (barr 2 2)]]
