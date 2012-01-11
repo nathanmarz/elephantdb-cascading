@@ -9,4 +9,4 @@
                   :exclusions [org.codehaus.janino/janino]]]
   :dev-dependencies [[org.clojure/clojure "1.3.0"]
                      [org.apache.hadoop/hadoop-core "0.20.2-dev"]
-                     [midje "1.3.0"]])
+                     [midje "1.3.0" :exclusions [org.clojure/clojure]]])
