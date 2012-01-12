@@ -123,11 +123,13 @@ public abstract class ElephantBaseTap<G extends IGateway> extends Hfs implements
         if (args.tmpDirs != null) {
             LocalElephantManager.setTmpDirs(conf, args.tmpDirs);
         }
+
         if (args.indexer != null)
             eargs.indexer = args.indexer;
 
-        // If recompute is set to false, we go ahead and populate the update Dir. Else,
-        // we leave it blank.
+        // If recompute is set to false, we go ahead and populate the
+        // update Dir. Else, we leave it blank.
+
         if (!args.recompute)
             eargs.updateDirHdfs = dstore.mostRecentVersionPath();
 
