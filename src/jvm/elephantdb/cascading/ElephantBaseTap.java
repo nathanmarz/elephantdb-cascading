@@ -40,10 +40,12 @@ public abstract class ElephantBaseTap<G extends IGateway> extends Hfs implements
         //source specific
         public Fields sourceFields = new Fields("key", "value");
         public Long version = null; //for sourcing
+        public boolean recompute = false;
 
         //sink specific
         public Fields sinkFields = Fields.ALL;
         public Indexer indexer = new IdentityIndexer();
+
     }
 
     String domainDir;
@@ -121,10 +123,13 @@ public abstract class ElephantBaseTap<G extends IGateway> extends Hfs implements
         if (args.tmpDirs != null) {
             LocalElephantManager.setTmpDirs(conf, args.tmpDirs);
         }
-        if (args.indexer != null) {
+        if (args.indexer != null)
             eargs.indexer = args.indexer;
+
+        // If recompute is set to false, we go ahead and populate the update Dir. Else,
+        // we leave it blank.
+        if (!args.recompute)
             eargs.updateDirHdfs = dstore.mostRecentVersionPath();
-        }
 
         return eargs;
     }
