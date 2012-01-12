@@ -19,9 +19,9 @@ import java.io.IOException;
 
 public class ElephantScheme extends Scheme {
     Serializer serializer;
-    IGateway gateway;
+    Gateway gateway;
 
-    public ElephantScheme(Fields sourceFields, Fields sinkFields, DomainSpec spec, IGateway gateway) {
+    public ElephantScheme(Fields sourceFields, Fields sinkFields, DomainSpec spec, Gateway gateway) {
         setSourceFields(sourceFields);
         setSinkFields(sinkFields);
         this.serializer = Utils.makeSerializer(spec);
@@ -48,7 +48,7 @@ public class ElephantScheme extends Scheme {
     public Tuple source(Object key, Object value) {
         byte[] valBytes = Utils.getBytes((BytesWritable) value);
         Object doc = getSerializer().deserialize(valBytes);
-        return gateway.buildTuple(doc);
+        return gateway.toTuple(doc);
     }
 
     // This is generic, this is good stuff.
@@ -57,7 +57,7 @@ public class ElephantScheme extends Scheme {
         Tuple tuple = tupleEntry.getTuple();
 
         int shard = tuple.getInteger(0);
-        Object doc = gateway.buildDocument(tuple);
+        Object doc = gateway.fromTuple(tuple);
 
         byte[] crushedDocument = getSerializer().serialize(doc);
         outputCollector.collect(new IntWritable(shard), new BytesWritable(crushedDocument));

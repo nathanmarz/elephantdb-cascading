@@ -15,45 +15,75 @@
            [elephantdb.document KeyValDocument]
            [elephantdb.store DomainStore]
            [elephantdb.cascading ElephantDBTap
-            ElephantBaseTap$Args ElephantTailAssembly]
+            ElephantDBTap$Args KeyValTailAssembly KeyValGateway]
            [org.apache.hadoop.io BytesWritable IntWritable]
            [org.apache.hadoop.mapred JobConf]))
 
-(defn hfs-tap [path & fields]
+;; ## Key-Value
+
+(defn hfs-tap
+  "Returns an Hfs tap with the default sequencefile scheme and the
+  supplied fields."
+  [path & fields]
   (-> (Fields. (into-array fields))
       (Hfs. path)))
 
-(defn kv-tap [path]
+(defn kv-tap
+  "Returns an HFS SequenceFile tap with two fields for key and
+  value."
+  [path]
   (hfs-tap path "key" "value"))
 
-(defn mk-options [& {:keys [indexer]}]
-  (let [ret (ElephantBaseTap$Args.)]
-    (set! (.indexer ret) indexer)
+(defn kv-opts
+  "Returns an EDB argument object tuned"
+  [& {:keys [indexer recompute?]}]
+  (let [ret (ElephantDBTap$Args.)]
+    (set! (.gateway ret) (KeyValGateway.))
+    (when indexer
+      (set! (.indexer ret) indexer))
+    (when recompute?
+      (set! (.recompute ret) recompute?))
     ret))
 
-(def props
-  {"io.serializations"
-   (join "," ["org.apache.hadoop.io.serializer.WritableSerialization"
-              "cascading.tuple.hadoop.BytesSerialization"
-              "cascading.tuple.hadoop.TupleSerialization"])})
+(def defaults
+  ["org.apache.hadoop.io.serializer.WritableSerialization"
+   "cascading.tuple.hadoop.BytesSerialization"
+   "cascading.tuple.hadoop.TupleSerialization"])
 
-(defn jobconf []
-  (let [conf (JobConf.)]
-    (doseq [[k v] props]
-      (.set conf k v))
-    conf))
+(defn conj-serialization!
+  "Appends the supplied serialization to the supplied JobConf
+  object. Returns the modified JobConf object."
+  [conf serialization]
+  (.set conf
+        "io.serializations"
+        (join "," (conj defaults serialization))))
 
-(defn create-source
-  [tmp-path pairs]
-  (let [src (kv-tap tmp-path)]
-    (with-open [collector (.openForWrite src (jobconf))]
-      (doseq [[k v] pairs]
-        (.add collector (Tuple. (into-array Object [k v])))))
-    src))
+(def default-props)
+
+(defn jobconf
+  "Returns a JobConf instance, optionally augmented by the supplied
+   property map.."
+  ([] (jobconf {}))
+  ([prop-map]
+     (let [conf (JobConf.)]
+       (doseq [[k v] prop-map]
+         (.set conf k v))
+       conf)))
+
+(defn populate!
+  "Accepts a key-value tap, a sequence of key-value pairs (and an
+  optional JobConf instance, supplied with the :conf keyword argument)
+  and sinks all key-value pairs into the tap. Returns the original tap
+  instance.."
+  [kv-tap kv-pairs & {:keys [props]}]
+  (with-open [collector (.openForWrite kv-tap (jobconf props))]
+    (doseq [[k v] kv-pairs]
+      (.add collector (Tuple. (into-array Object [k v])))))
+  kv-tap)
 
 (defn connect
   "Connect the supplied source and sink with the supplied pipe."
-  [pipe source sink]
+  [pipe source sink & {:keys [props] :or {props {}}}]
   (doto (.connect (FlowConnector. props) source sink pipe)
     (.complete)))
 
@@ -70,7 +100,7 @@
   supplied elephant-tap."
   [source elephant-sink]
   (connect (-> (Pipe. "pipe")
-               (ElephantTailAssembly. elephant-sink))
+               (KeyValTailAssembly. elephant-sink))
            source
            elephant-sink))
 
@@ -79,7 +109,8 @@
   kv-pairs."
   [elephant-sink pairs]
   (test/with-fs-tmp [_ tmp]
-    (-> (create-source tmp pairs)
+    (-> (kv-tap tmp)
+        (populate! pairs)
         (hfs->elephant elephant-sink))))
 
 (defn get-tuples
@@ -93,7 +124,7 @@
 (tabular
  (fact "connect-test"
    (test/with-fs-tmp [_ src-tmp sink-tmp]     
-     (let [sink (ElephantDBTap. sink-tmp
+     (let [sink (ElephantBaseTap. sink-tmp
                                 (DomainSpec. (JavaBerkDB.) (HashModScheme.) 4)
                                 (mk-options))]
        (fill-domain sink ?xs))))
@@ -103,7 +134,7 @@
 
 (defn read-etap-with-flow [path]
   (test/with-fs-tmp [fs tmp-path]
-    (let [source (ElephantDBTap. path)
+    (let [source (ElephantBaseTap. path)
           sink (kv-tap tmp-path)]
       (elephant->hfs source sink)
       (get-tuples sink))))
@@ -119,7 +150,7 @@
 (fact "test basic"
   (test/with-fs-tmp [fs tmp]
     (let [spec (DomainSpec. (JavaBerkDB.) (HashModScheme.) 4)
-          sink (ElephantDBTap. tmp spec (mk-options :indexer nil))
+          sink (ElephantBaseTap. tmp spec (mk-options :indexer nil))
           data {0 (barr 0 0)
                 1 (barr 1 1)
                 2 (barr 2 2)
@@ -142,7 +173,7 @@
 (fact "test-incremental"
   (test/with-fs-tmp [fs tmp]
     (let [spec (DomainSpec. (JavaBerkDB.) (HashModScheme.) 2)
-          sink (ElephantDBTap. tmp spec (mk-options :indexer (IdentityIndexer.)))
+          sink (ElephantBaseTap. tmp spec (mk-options :indexer (IdentityIndexer.)))
           data [[(barr 0) (barr 0 0)]
                 [(barr 1) (barr 1 1)]
                 [(barr 2) (barr 2 2)]]
