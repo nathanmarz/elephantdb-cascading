@@ -163,9 +163,12 @@ public class ElephantDBTap extends Hfs implements FlowListener {
                 DomainStore dstore = getDomainStore();
                 if (flow.getFlowStats().isSuccessful()) {
                     dstore.getFileSystem().mkdirs(new Path(newVersionPath));
-                    if (args.indexer != null) {
+
+                    // If the user wants to run a recompute, skip version synchronization.
+                    if (!args.recompute) {
                         dstore.synchronizeInProgressVersion(newVersionPath);
                     }
+
                     dstore.succeedVersion(newVersionPath);
                 } else {
                     dstore.failVersion(newVersionPath);

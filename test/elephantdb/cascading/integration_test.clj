@@ -1,5 +1,6 @@
 (ns elephantdb.cascading.integration-test
   (:use midje.sweet
+        clojure.test
         elephantdb.test.common)
   (:require [elephantdb.test.keyval :as t]
             [hadoop-util.test :as test]
@@ -11,7 +12,7 @@
            [elephantdb.partition HashModScheme]
            [elephantdb.persistence JavaBerkDB]
            [elephantdb DomainSpec Utils]
-           [elephantdb.index IdentityIndexer]
+           [elephantdb.index StringAppendIndexer]
            [elephantdb.document KeyValDocument]
            [elephantdb.store DomainStore]
            [elephantdb.cascading ElephantDBTap
@@ -87,8 +88,17 @@
         new-val (str old-val "," serialization)]
     (.set conf "io.serializations" new-val)))
 
+(defn elephant-tap
+  "Returns an ElephantDB Tap tuned to the supplied path and
+  shard-count. Optionally, you can supply keyword arguments as
+  specified by `kv-opts`."
+  [path shard-count & options]
+  (ElephantDBTap. path
+                  (kv-spec shard-count)
+                  (apply kv-opts options)))
+
 (defn populate!
-  "Accepts a key-value tap, a sequence of key-value pairs (and an
+  "Accepts a SequenceFile tap, a sequence of key-value pairs (and an
   optional JobConf instance, supplied with the :conf keyword argument)
   and sinks all key-value pairs into the tap. Returns the original tap
   instance.."
@@ -131,7 +141,7 @@
             source
             elephant-sink))
 
-(defn fill-domain
+(defn populate-edb!
   "Fills the supplied elephant-sink with the the supplied sequence of
   kv-pairs."
   [elephant-sink pairs]
@@ -140,103 +150,88 @@
         (populate! pairs)
         (hfs->elephant! elephant-sink))))
 
-(defn read-etap-with-flow [tap]
-  (test/with-fs-tmp [fs tmp-path]
-    (let [sink (kv-tap tmp-path)]
-      (elephant->hfs! source sink)
-      (tuple-seq sink))))
+(defn produces
+  "Returns a chatty checker that tests for equality between two
+  sequences of tuples."
+  [expected]
+  (chatty-checker [actual]
+                  (= (set expected)
+                     (set (tuple-seq actual)))))
 
-(defn just-tuples [actual]
-  (chatty-checker [expected]
-                  (= (set (tuple-seq actual))
-                     (set expected))))
+;; ## Tests
 
-(tabular
- (fact "connect-test"
-   (test/with-fs-tmp [_ src-tmp sink-tmp]     
-     (let [sink (ElephantBaseTap. sink-tmp
-                                  (kv-spec 4)
-                                  (mk-options))]
-       (fill-domain sink ?xs))))
- ?xs
- [[1 2] [3 4]]
- [["key" "val"] ["ham" "burger"]])
+(deftest round-trip-test
+  (tabular
+   (fact
+     "Tuples sunk into an ElephantDB tap and read back out should
+    match. (A map acts as a sequence of 2-tuples, perfect for
+    ElephantDB key-val tests.)"
+     (test/with-fs-tmp [_ tmp]
+       (let [e-tap (elephant-tap tmp 4)]
+         (populate-edb! e-tap ?tuples)
+         e-tap => (produces ?tuples))))
+   ?tuples
+   {1 2, 3 4}
+   {"key" "val", "ham" "burger"}))
 
-;; TODO: Invalid. Doesn't belong in this project; this makes far too
-;; many assumptions about a thrift interface, etc. All we're concerned
-;; about here is getting data in and out of edb w/ cascading.
-(fact "test basic"
-  (test/with-fs-tmp [fs tmp]
-    (let [spec (DomainSpec. (JavaBerkDB.) (HashModScheme.) 4)
-          sink (ElephantBaseTap. tmp spec (mk-options :indexer nil))
-          data {0 (barr 0 0)
-                1 (barr 1 1)
-                2 (barr 2 2)
-                3 (barr 3 3)
-                4 (barr 4 4)
-                5 (barr 5 5)
-                6 (barr 6 5)
-                7 (barr 7 5)
-                8 (barr 8 5)}
-          data2 {0 (barr 1)
-                 10 (barr 100)}]
-      (fill-domain sink data)
-      (tuple-seq sink) => (just (seq data) :in-any-order)
-      (fill-domain sink data2)
-      (tuple-seq sink) => (just (conj (seq data2) [(barr 1) nil]) :in-any-order))))
+(deftest recompute-test
+  (fact "FILLIN"
+    (test/with-fs-tmp [fs tmp]
+      (let [sink (elephant-tap tmp 4 :recompute? true)
+            data {0 "zero"
+                  1 "one"
+                  2 "two"
+                  3 "three"
+                  4 "four"
+                  5 "five"
+                  6 "six"
+                  7 "seven"
+                  8 "eight"}
+            data2 {0 "zero!!"
+                   10 "ten"}]
+        (fact "FILLIN"
+          (populate-edb! sink data)
+          sink => (produces data))
 
-;; TODO: Invalid. Doesn't belong in this project; this makes far too
-;; many assumptions about a thrift interface, etc. All we're concerned
-;; about here is getting data in and out of edb w/ cascading.
-(fact "test-incremental"
-  (test/with-fs-tmp [fs tmp]
-    (let [spec (DomainSpec. (JavaBerkDB.) (HashModScheme.) 2)
-          sink (ElephantBaseTap. tmp spec (mk-options :indexer (IdentityIndexer.)))
-          data [[(barr 0) (barr 0 0)]
-                [(barr 1) (barr 1 1)]
-                [(barr 2) (barr 2 2)]]
-          data2 [[(barr 0) (barr 1)]
-                 [(barr 3) (barr 3)]]
-          data3 [[(barr 0) (barr 1)]
-                 [(barr 1) (barr 1 1)]
-                 [(barr 2) (barr 2 2)]
-                 [(barr 3) (barr 3)]]]
-      (fill-domain sink data)
-      (tuple-seq sink) => (just (seq data) :in-any-order)
-      (fill-domain sink data2)
-      (tuple-seq sink) => (just (seq data3) :in-any-order))))
+        (fact "FILLIN"
+          (populate-edb! sink data2)
+          sink => (produces (merge data2 {0 nil})))))))
 
-(fact "test-source"
-  (test/with-fs-tmp [fs tmp]
-    (let [pairs [[(barr 0) (barr 0 2)]
-                 [(barr 1) (barr 1 1)]
-                 [(barr 2) (barr 9 1)]
-                 [(barr 33) (barr 0 2 3)]
-                 [(barr 4) (barr 0)]
-                 [(barr 5) (barr 1)]
-                 [(barr 6) (barr 3)]
-                 [(barr 7) (barr 9 101 9 9)]
-                 [(barr 81) (barr 9 9 9 1)]
-                 [(barr 9) (barr 9 9 2)]
-                 [(barr 102) (barr 3 6)]]]
-      (t/with-sharded-domain [dpath
-                              {:num-shards 6
-                               :persistence-factory (JavaBerkDB.)}
-                              pairs]
-        (fact
-          (t/kv-pairs= pairs (read-etap-with-flow dpath)) => true)))))
+(deftest replace-test
+  (facts "FILLIN"
+    (test/with-fs-tmp [fs tmp]
+      (let [sink (elephant-tap tmp 2)
+            data {0 "zero"
+                  1 "one"
+                  2 "two"}
+            data2 {0 "ZERO!"
+                   3 "THREE!"}]
+        (fact "FILLIN"
+          (populate-edb! sink data)
+          sink => (produces data))
 
-;; Example of how to do stuff now.
+        (fact "FILLIN"
+          (populate-edb! sink data2)
+          sink => (produces (merge data data2)))))))
 
-(defn populate [root idx]
-  (with-open [shard (.createShard (kv-spec 4) root idx)]
-    (doseq [x (range 1000)]
-      (.index shard (KeyValDocument. x 10)))))
-
-;; or, you can create a domain store directly:
-
-(defn store []
-  (test/with-fs-tmp [_ tmp]
-    (DomainStore. tmp (DomainSpec. (JavaBerkDB.)
-                                   (HashModScheme.)
-                                   4))))
+(deftest incremental-test
+  (facts "FILLIN"
+    (test/with-fs-tmp [fs tmp]
+      (let [sink (elephant-tap tmp 2 :indexer (StringAppendIndexer.))
+            data   {0 "zero"
+                    1 "one"
+                    2 "two"}
+            data2  {0 "ZERO!"
+                    2 "TWO!"
+                    3 "THREE!"}
+            merged {0 "zeroZERO!"
+                    1 "one"
+                    2 "twoTWO!"
+                    3 "THREE!"}]
+        (fact "FILLIN"
+          (populate-edb! sink data)
+          sink => (produces data))
+        
+        (fact "FILLIN"
+          (populate-edb! sink data2)
+          sink => (produces merged))))))
