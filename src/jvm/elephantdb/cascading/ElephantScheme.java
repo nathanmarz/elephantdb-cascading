@@ -23,9 +23,9 @@ import java.io.IOException;
 
 public class ElephantScheme extends Scheme<HadoopFlowProcess, JobConf, RecordReader, OutputCollector, Object[], Object[]> {
     Serializer serializer;
-    IGateway gateway;
+    Gateway gateway;
 
-    public ElephantScheme(Fields sourceFields, Fields sinkFields, DomainSpec spec, IGateway gateway) {
+    public ElephantScheme(Fields sourceFields, Fields sinkFields, DomainSpec spec, Gateway gateway) {
         setSourceFields(sourceFields);
         setSinkFields(sinkFields);
         this.serializer = Utils.makeSerializer(spec);
@@ -70,7 +70,7 @@ public class ElephantScheme extends Scheme<HadoopFlowProcess, JobConf, RecordRea
         byte[] valBytes = Utils.getBytes(value);
         Object doc = getSerializer().deserialize(valBytes);
 
-        sourceCall.getIncomingEntry().setTuple(gateway.buildTuple(doc));
+        sourceCall.getIncomingEntry().setTuple(gateway.toTuple(doc));
         return true;
     }
 
@@ -80,7 +80,7 @@ public class ElephantScheme extends Scheme<HadoopFlowProcess, JobConf, RecordRea
 
 
         int shard = tuple.getInteger(0);
-        Object doc = gateway.buildDocument(tuple);
+        Object doc = gateway.fromTuple(tuple);
 
         byte[] crushedDocument = getSerializer().serialize(doc);
         sinkCall.getOutput().collect(new IntWritable(shard), new BytesWritable(crushedDocument));

@@ -20,8 +20,8 @@ import org.apache.log4j.Logger;
 
 import java.util.UUID;
 
-public class ElephantTailAssembly extends SubAssembly {
-    public static Logger LOG = Logger.getLogger(ElephantTailAssembly.class);
+public class KeyValTailAssembly extends SubAssembly {
+    public static Logger LOG = Logger.getLogger(KeyValTailAssembly.class);
 
     public static class Shardize extends BaseOperation implements Function {
         ShardingScheme shardScheme;
@@ -60,7 +60,7 @@ public class ElephantTailAssembly extends SubAssembly {
         }
     }
 
-    public ElephantTailAssembly(Pipe keyValuePairs, ElephantDBTap outTap) {
+    public KeyValTailAssembly(Pipe keyValuePairs, ElephantDBTap outTap) {
         // generate two random field names
         String shardField = "shard" + UUID.randomUUID().toString();
         String keySortField = "keysort" + UUID.randomUUID().toString();
@@ -69,8 +69,7 @@ public class ElephantTailAssembly extends SubAssembly {
         LOG.info("Instantiating spec: " + spec);
 
         // Add the shard index as field #2.
-        Pipe out =
-            new Each(keyValuePairs, new Fields(0), new Shardize(shardField, spec), Fields.ALL);
+        Pipe out = new Each(keyValuePairs, new Fields(0), new Shardize(shardField, spec), Fields.ALL);
 
         // Add the serialized key itself as field #3 for sorting.
         // TODO: Make secondary sorting optional, and come up with a function to generate
