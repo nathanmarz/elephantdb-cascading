@@ -2,6 +2,7 @@
   (:use midje.sweet
         elephantdb.test.common)
   (:require [elephantdb.test.keyval :as t]
+            [jackknife.logging :as log]
             [hadoop-util.test :as test]
             [clojure.string :as s])
   (:import [cascading.pipe Pipe]
@@ -156,13 +157,22 @@
                      (set (tuple-seq actual)))))
 
 (defmacro with-kv-tap
+  "Accepts a binding vector with the tap-symbol (for binding, as with
+  `let`), the shard-count and optional keyword arguments to be passed
+  on to `kv-opts` above.
+
+  `with-kv-tap` accepts a `:log-level` optional keyword argument that
+  can be used to tune the output of all jobs run within the
+  form. Valid log level values or `:fatal`, `:warn`, `:info`, `:debug`
+  and `:off`."
   [[sym shard-count & opts] & body]
-  `(test/with-fs-tmp [fs# tmp#]
-     (let [~sym (elephant-tap tmp# ~shard-count ~@opts)]
-       ~@body)))
+  (let [log-level (:log-level (apply hash-map opts) :off)]
+    `(log/with-log-level ~log-level
+       (test/with-fs-tmp [fs# tmp#]
+         (let [~sym (elephant-tap tmp# ~shard-count ~@opts)]
+           ~@body)))))
 
 ;; ## Tests
-
 
 (tabular
  (fact
