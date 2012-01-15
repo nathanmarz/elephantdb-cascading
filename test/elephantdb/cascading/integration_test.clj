@@ -1,6 +1,5 @@
 (ns elephantdb.cascading.integration-test
   (:use midje.sweet
-        clojure.test
         elephantdb.test.common)
   (:require [elephantdb.test.keyval :as t]
             [hadoop-util.test :as test]
@@ -11,13 +10,11 @@
            [cascading.tap Hfs]
            [elephantdb.partition HashModScheme]
            [elephantdb.persistence JavaBerkDB]
-           [elephantdb DomainSpec Utils]
+           [elephantdb DomainSpec]
            [elephantdb.index StringAppendIndexer]
            [elephantdb.document KeyValDocument]
-           [elephantdb.store DomainStore]
            [elephantdb.cascading ElephantDBTap
             ElephantDBTap$Args KeyValTailAssembly KeyValGateway]
-           [org.apache.hadoop.io BytesWritable IntWritable]
            [org.apache.hadoop.mapred JobConf]))
 
 ;; ## Key-Value
@@ -45,13 +42,13 @@
 
 (defn kv-opts
   "Returns an EDB argument object tuned"
-  [& {:keys [indexer recompute?]}]
+  [& {:keys [indexer incremental]
+      :or {incremental true}}]
   (let [ret (ElephantDBTap$Args.)]
     (set! (.gateway ret) (KeyValGateway.))
+    (set! (.incremental ret) incremental)
     (when indexer
       (set! (.indexer ret) indexer))
-    (when recompute?
-      (set! (.recompute ret) recompute?))
     ret))
 
 (def defaults
@@ -97,17 +94,6 @@
                   (kv-spec shard-count)
                   (apply kv-opts options)))
 
-(defn populate!
-  "Accepts a SequenceFile tap, a sequence of key-value pairs (and an
-  optional JobConf instance, supplied with the :conf keyword argument)
-  and sinks all key-value pairs into the tap. Returns the original tap
-  instance.."
-  [kv-tap kv-pairs & {:keys [props]}]
-  (with-open [collector (.openForWrite kv-tap (job-conf props))]
-    (doseq [[k v] kv-pairs]
-      (.add collector (Tuple. (into-array Object [k v])))))
-  kv-tap)
-
 (defn connect!
   "Connect the supplied source and sink with the supplied pipe."
   [pipe source sink & {:keys [props]}]
@@ -141,6 +127,17 @@
             source
             elephant-sink))
 
+(defn populate!
+  "Accepts a SequenceFile tap, a sequence of key-value pairs (and an
+  optional JobConf instance, supplied with the :conf keyword argument)
+  and sinks all key-value pairs into the tap. Returns the original tap
+  instance.."
+  [kv-tap kv-pairs & {:keys [props]}]
+  (with-open [collector (.openForWrite kv-tap (job-conf props))]
+    (doseq [[k v] kv-pairs]
+      (.add collector (Tuple. (into-array Object [k v])))))
+  kv-tap)
+
 (defn populate-edb!
   "Fills the supplied elephant-sink with the the supplied sequence of
   kv-pairs."
@@ -158,80 +155,96 @@
                   (= (set expected)
                      (set (tuple-seq actual)))))
 
+(defmacro with-kv-tap
+  [[sym shard-count & opts] & body]
+  `(test/with-fs-tmp [fs# tmp#]
+     (let [~sym (elephant-tap tmp# ~shard-count ~@opts)]
+       ~@body)))
+
 ;; ## Tests
 
-(deftest round-trip-test
-  (tabular
-   (fact
-     "Tuples sunk into an ElephantDB tap and read back out should
+
+(tabular
+ (fact
+   "Tuples sunk into an ElephantDB tap and read back out should
     match. (A map acts as a sequence of 2-tuples, perfect for
     ElephantDB key-val tests.)"
-     (test/with-fs-tmp [_ tmp]
-       (let [e-tap (elephant-tap tmp 4)]
-         (populate-edb! e-tap ?tuples)
-         e-tap => (produces ?tuples))))
-   ?tuples
-   {1 2, 3 4}
-   {"key" "val", "ham" "burger"}))
+   (with-kv-tap [e-tap 4]
+     (populate-edb! e-tap ?tuples)
+     e-tap => (produces ?tuples)))
+ ?tuples
+ {1 2, 3 4}
+ {"key" "val", "ham" "burger"})
 
-(deftest recompute-test
-  (fact "FILLIN"
-    (test/with-fs-tmp [fs tmp]
-      (let [sink (elephant-tap tmp 4 :recompute? true)
-            data {0 "zero"
-                  1 "one"
-                  2 "two"
-                  3 "three"
-                  4 "four"
-                  5 "five"
-                  6 "six"
-                  7 "seven"
-                  8 "eight"}
-            data2 {0 "zero!!"
-                   10 "ten"}]
-        (fact "FILLIN"
-          (populate-edb! sink data)
-          sink => (produces data))
+(facts
+  "When incremental is set to false, ElephantDB should generate a
+     new domain completely independent of the old domain."
+  (with-kv-tap [sink 4 :incremental false]
+    (let [data {0 "zero"
+                1 "one"
+                2 "two"
+                3 "three"
+                4 "four"
+                5 "five"
+                6 "six"
+                7 "seven"
+                8 "eight"}
+          data2 {0 "zero!!"
+                 10 "ten"}]
+      (fact "Populating the sink with `data` produces `data`."
+        (populate-edb! sink data)
+        sink => (produces data))
 
-        (fact "FILLIN"
-          (populate-edb! sink data2)
-          sink => (produces (merge data2 {0 nil})))))))
+      (fact "Sinking data2 on top of data should knock out all old
+      values, leaving only data2."
+        (populate-edb! sink data2)
+        sink => (produces data2)))))
 
-(deftest replace-test
-  (facts "FILLIN"
-    (test/with-fs-tmp [fs tmp]
-      (let [sink (elephant-tap tmp 2)
-            data {0 "zero"
+(facts "Incremental defaults to `true`, bringing an updater into
+  play. For a key-value store, the default behavior on an incremental
+  update is for new kv-pairs to knock out existing kv-pairs."
+  (with-kv-tap [sink 2]
+    (let [data {0 "zero"
+                1 "one"
+                2 "two"}
+          data2 {0 "ZERO!"
+                 3 "THREE!"}]
+      (fact "Populating the sink with `data` produces `data`."
+        (populate-edb! sink data)
+        sink => (produces data))
+
+      (fact "Sinking `data2` on top of `data` produces the same set
+        of tuples as merging two clojure maps"
+        (populate-edb! sink data2)
+        sink => (produces (merge data data2))))))
+
+(facts
+  "Explicitly set an indexer to customize the incremental update
+  behavior. This test checks that the StringAppendIndexer merges by
+  appending the new value onto the old value instead of knocking out
+  the old value completely."
+  (with-kv-tap [sink 2 :indexer (StringAppendIndexer.)]
+    (let [data   {0 "zero"
                   1 "one"
                   2 "two"}
-            data2 {0 "ZERO!"
-                   3 "THREE!"}]
-        (fact "FILLIN"
-          (populate-edb! sink data)
-          sink => (produces data))
+          data2  {0 "ZERO!"
+                  2 "TWO!"
+                  3 "THREE!"}
+          merged {0 "zeroZERO!"
+                  1 "one"
+                  2 "twoTWO!"
+                  3 "THREE!"}]
+      (fact "Populating the sink with `data` produces `data`."
+        (populate-edb! sink data)
+        sink => (produces data))
+      
+      (fact "Sinking `data2` on top of `data` causes clashing values
+        to merge with a string-append."
+        (populate-edb! sink data2)
+        sink => (produces merged)
 
-        (fact "FILLIN"
-          (populate-edb! sink data2)
-          sink => (produces (merge data data2)))))))
+        "Note that `merged` can be created with clojure's `merge-with`."
+        (merge-with str data data2) => merged))))
 
-(deftest incremental-test
-  (facts "FILLIN"
-    (test/with-fs-tmp [fs tmp]
-      (let [sink (elephant-tap tmp 2 :indexer (StringAppendIndexer.))
-            data   {0 "zero"
-                    1 "one"
-                    2 "two"}
-            data2  {0 "ZERO!"
-                    2 "TWO!"
-                    3 "THREE!"}
-            merged {0 "zeroZERO!"
-                    1 "one"
-                    2 "twoTWO!"
-                    3 "THREE!"}]
-        (fact "FILLIN"
-          (populate-edb! sink data)
-          sink => (produces data))
-        
-        (fact "FILLIN"
-          (populate-edb! sink data2)
-          sink => (produces merged))))))
+(future-fact
+ "Test of support for multiple types of serialization.")

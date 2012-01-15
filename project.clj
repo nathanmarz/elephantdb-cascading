@@ -5,6 +5,7 @@
   :repositories {"conjars" "http://conjars.org/repo"}
   :dependencies [[elephantdb "0.2.0"]
                  [hadoop-util "0.2.7"]
+                 [jackknife "0.1.2"]
                  [cascading/cascading-core "1.2.4"
                   :exclusions [org.codehaus.janino/janino]]]
   :dev-dependencies [[org.clojure/clojure "1.3.0"]

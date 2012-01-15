@@ -41,7 +41,7 @@ public class ElephantDBTap extends Hfs implements FlowListener {
         //sink specific
         public Fields sinkFields = Fields.ALL;
         public Indexer indexer = new IdentityIndexer();
-        public boolean recompute = false; //for sourcing
+        public boolean incremental = false; //for sourcing
     }
 
     String domainDir;
@@ -113,9 +113,9 @@ public class ElephantDBTap extends Hfs implements FlowListener {
         if (args.indexer != null)
             eargs.indexer = args.indexer;
 
-        // If recompute is set to false, we go ahead and populate the
+        // If incremental is set to true, we go ahead and populate the
         // update Dir. Else, we leave it blank.
-        if (!args.recompute)
+        if (args.incremental)
             eargs.updateDirHdfs = dstore.mostRecentVersionPath();
 
         return eargs;
@@ -164,8 +164,8 @@ public class ElephantDBTap extends Hfs implements FlowListener {
                 if (flow.getFlowStats().isSuccessful()) {
                     dstore.getFileSystem().mkdirs(new Path(newVersionPath));
 
-                    // If the user wants to run a recompute, skip version synchronization.
-                    if (!args.recompute) {
+                    // If the user wants to run a incremental, skip version synchronization.
+                    if (args.incremental) {
                         dstore.synchronizeInProgressVersion(newVersionPath);
                     }
 
