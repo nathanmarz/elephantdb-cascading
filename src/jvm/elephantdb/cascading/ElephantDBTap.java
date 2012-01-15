@@ -2,186 +2,128 @@ package elephantdb.cascading;
 
 import cascading.flow.Flow;
 import cascading.flow.FlowListener;
-import cascading.scheme.Scheme;
+import cascading.tap.Hfs;
 import cascading.tap.Tap;
 import cascading.tap.TapException;
-import cascading.tap.hadoop.TapCollector;
-import cascading.tap.hadoop.TapIterator;
 import cascading.tuple.Fields;
-import cascading.tuple.Tuple;
-import cascading.tuple.TupleEntry;
-import cascading.tuple.TupleEntryCollector;
-import cascading.tuple.TupleEntryIterator;
 import elephantdb.DomainSpec;
 import elephantdb.Utils;
 import elephantdb.hadoop.ElephantInputFormat;
 import elephantdb.hadoop.ElephantOutputFormat;
-import elephantdb.hadoop.ElephantRecordWritable;
-import elephantdb.hadoop.ElephantUpdater;
 import elephantdb.hadoop.LocalElephantManager;
-import elephantdb.hadoop.ReplaceUpdater;
+import elephantdb.index.IdentityIndexer;
+import elephantdb.index.Indexer;
 import elephantdb.store.DomainStore;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.mapred.FileInputFormat;
+import org.apache.hadoop.mapred.JobConf;
+import org.apache.log4j.Logger;
+
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.List;
-import java.util.Map;
 import java.util.Map.Entry;
 import java.util.UUID;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.io.BytesWritable;
-import org.apache.hadoop.io.IntWritable;
-import org.apache.hadoop.mapred.FileInputFormat;
-import org.apache.hadoop.mapred.JobConf;
-import org.apache.hadoop.mapred.OutputCollector;
 
-
-public class ElephantDBTap extends Tap implements FlowListener {
-    public static class ElephantScheme extends Scheme {
-        @Override
-        public void sourceInit(Tap tap, JobConf jc) throws IOException {
-            throw new UnsupportedOperationException("Not supported yet.");
-        }
-
-        @Override
-        public void sinkInit(Tap tap, JobConf jc) throws IOException {
-            throw new UnsupportedOperationException("Not supported yet.");
-        }
-
-        @Override
-        public Tuple source(Object o, Object o1) {
-            throw new UnsupportedOperationException("Not supported yet.");
-        }
-
-        @Override
-        public void sink(TupleEntry te, OutputCollector oc) throws IOException {
-            throw new UnsupportedOperationException("Not supported yet.");
-        }
-    }
+public class ElephantDBTap extends Hfs implements FlowListener {
+    public static final Logger LOG = Logger.getLogger(ElephantDBTap.class);
 
     public static class Args implements Serializable {
         //for source and sink
-        public Map<String, Object> persistenceOptions = null;
         public List<String> tmpDirs = null;
-        public int timeoutMs = 2*60*60*1000; // 2 hours
+        public int timeoutMs = 2 * 60 * 60 * 1000; // 2 hours
+        public Gateway gateway = new IdentityGateway();
 
         //source specific
         public Fields sourceFields = new Fields("key", "value");
         public Long version = null; //for sourcing
-        public Deserializer deserializer = null;
 
         //sink specific
         public Fields sinkFields = Fields.ALL;
-        public ElephantUpdater updater = new ReplaceUpdater(); //set this to null to prevent updating
+        public Indexer indexer = new IdentityIndexer();
+        public boolean incremental = false; //for sourcing
     }
 
-    String _domainDir;
-    DomainSpec _spec;
-    Args _args;
-    String _newVersionPath;
-
-    public ElephantDBTap(String dir, Args args) throws IOException {
-        this(dir, null, args);
-    }
-
-    public ElephantDBTap(String dir, DomainSpec spec) throws IOException {
-        this(dir, spec, new Args());
-    }
-
-    public ElephantDBTap(String dir) throws IOException {
-        this(dir, null, new Args());
-    }
+    String domainDir;
+    DomainSpec spec;
+    Args args;
+    String newVersionPath;
 
     public ElephantDBTap(String dir, DomainSpec spec, Args args) throws IOException {
-        super(new ElephantScheme());
-        _domainDir = dir;
-        _spec = new DomainStore(dir, spec).getSpec();
-        _args = args;
-        _id = globalid++;
+        domainDir = dir;
+        this.args = args;
+        this.spec = new DomainStore(dir, spec).getSpec();
+
+        setStringPath(domainDir);
+        setScheme(new ElephantScheme(this.args.sourceFields,
+            this.args.sinkFields, this.spec, this.args.gateway));
     }
 
-    private DomainStore getDomainStore() throws IOException {
-        return new DomainStore(_domainDir, _spec);
+    public DomainStore getDomainStore() throws IOException {
+        return new DomainStore(domainDir, spec);
     }
 
     public DomainSpec getSpec() {
-        return _spec;
-    }
-
-    @Override
-    public Fields getSinkFields() {
-        return _args.sinkFields;
-    }
-
-    @Override
-    public Fields getSourceFields() {
-        return _args.sourceFields;
-    }
-
-    @Override
-    public boolean isWriteDirect() {
-        return true;
-    }
-
-    @Override
-    public Tuple source(Object key, Object value) {
-        key = _args.deserializer == null ? key : _args.deserializer.deserialize((BytesWritable) key);
-        return new Tuple(key, value);
+        return spec;
     }
 
     @Override
     public void sourceInit(JobConf conf) throws IOException {
-        FileInputFormat.setInputPaths( conf, "/" + UUID.randomUUID().toString());
-        ElephantInputFormat.Args eargs = new ElephantInputFormat.Args(_domainDir);
-        eargs.inputDirHdfs = _domainDir;
-        if(_args.persistenceOptions!=null)
-            eargs.persistenceOptions = _args.persistenceOptions;
-        if(_args.tmpDirs!=null)
-            LocalElephantManager.setTmpDirs(conf, _args.tmpDirs);
-        eargs.version = _args.version;
+        super.sourceInit(conf);
 
-        conf.setInt("mapred.task.timeout", _args.timeoutMs);
+        FileInputFormat.setInputPaths(conf, "/" + UUID.randomUUID().toString());
+
+        ElephantInputFormat.Args eargs = new ElephantInputFormat.Args(domainDir);
+        eargs.inputDirHdfs = domainDir;
+
+        if (args.tmpDirs != null) {
+            LocalElephantManager.setTmpDirs(conf, args.tmpDirs);
+        }
+
+        eargs.version = args.version;
+
+        conf.setInt("mapred.task.timeout", args.timeoutMs);
         Utils.setObject(conf, ElephantInputFormat.ARGS_CONF, eargs);
-        conf.setInputFormat(ElephantInputFormat.class);
     }
 
-    @Override
-    public void sink(TupleEntry tupleEntry, OutputCollector outputCollector) throws IOException {
-        int shard = tupleEntry.getInteger(0);
-        Object key = tupleEntry.get(1);
-        byte[] keybytes = Common.serializeElephantVal(key);
-        byte[] valuebytes = Common.getBytes((BytesWritable)tupleEntry.get(2));
+    @Override public void sinkInit(JobConf conf) throws IOException {
+        super.sinkInit(conf);
 
-        ElephantRecordWritable record = new ElephantRecordWritable(keybytes, valuebytes);
-        outputCollector.collect(new IntWritable(shard), record);
-    }
+        ElephantOutputFormat.Args args = outputArgs(conf);
 
-    @Override
-    public void sinkInit(JobConf conf) throws IOException {
-        DomainStore dstore = getDomainStore();
-        if(_newVersionPath==null) { //working around cascading calling sinkinit twice
-            _newVersionPath = dstore.createVersion();
-        }
-        ElephantOutputFormat.Args eargs = new ElephantOutputFormat.Args(_spec, _newVersionPath);
-        if(_args.persistenceOptions!=null) {
-            eargs.persistenceOptions = _args.persistenceOptions;
-        }
-        if(_args.tmpDirs!=null) {
-            LocalElephantManager.setTmpDirs(conf, _args.tmpDirs);
-        }
-        if(_args.updater!=null) {
-            eargs.updater = _args.updater;
-            eargs.updateDirHdfs = dstore.mostRecentVersionPath();
-        }
-        Utils.setObject(conf, ElephantOutputFormat.ARGS_CONF, eargs);
-        conf.setInt("mapred.task.timeout", _args.timeoutMs);
+        // serialize this particular argument off into the JobConf.
+        Utils.setObject(conf, ElephantOutputFormat.ARGS_CONF, args);
+        conf.setInt("mapred.task.timeout", this.args.timeoutMs);
         conf.setBoolean("mapred.reduce.tasks.speculative.execution", false);
-        conf.setInt("mapred.reduce.tasks", _spec.getNumShards());
-        conf.setOutputFormat(ElephantOutputFormat.class);
+        conf.setInt("mapred.reduce.tasks", spec.getNumShards());
+    }
+
+    public ElephantOutputFormat.Args outputArgs(JobConf conf) throws IOException {
+        DomainStore dstore = getDomainStore();
+
+        if (newVersionPath == null) { //working around cascading calling sinkinit twice
+            newVersionPath = dstore.createVersion();
+        }
+        ElephantOutputFormat.Args eargs = new ElephantOutputFormat.Args(spec, newVersionPath);
+
+        if (args.tmpDirs != null) {
+            LocalElephantManager.setTmpDirs(conf, args.tmpDirs);
+        }
+
+        if (args.indexer != null)
+            eargs.indexer = args.indexer;
+
+        // If incremental is set to true, we go ahead and populate the
+        // update Dir. Else, we leave it blank.
+        if (args.incremental)
+            eargs.updateDirHdfs = dstore.mostRecentVersionPath();
+
+        return eargs;
     }
 
     @Override
     public Path getPath() {
-        return new Path(_domainDir);
+        return new Path(domainDir);
     }
 
     @Override
@@ -192,11 +134,6 @@ public class ElephantDBTap extends Tap implements FlowListener {
     @Override
     public boolean deletePath(JobConf jc) throws IOException {
         throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public boolean pathExists(JobConf jc) throws IOException {
-        return false;
     }
 
     @Override
@@ -213,62 +150,38 @@ public class ElephantDBTap extends Tap implements FlowListener {
     }
 
     private boolean isSinkOf(Flow flow) {
-        for(Entry<String, Tap> e: flow.getSinks().entrySet()) {
-            if(e.getValue()==this) return true;
+        for (Entry<String, Tap> e : flow.getSinks().entrySet()) {
+            if (e.getValue() == this)
+                return true;
         }
         return false;
     }
 
     public void onCompleted(Flow flow) {
         try {
-            if(isSinkOf(flow)) {
+            if (isSinkOf(flow)) {
                 DomainStore dstore = getDomainStore();
-                if(flow.getFlowStats().isSuccessful()) {
-                    dstore.getFileSystem().mkdirs(new Path(_newVersionPath));
-                    if(_args.updater!=null) {
-                        dstore.synchronizeInProgressVersion(_newVersionPath);
+                if (flow.getFlowStats().isSuccessful()) {
+                    dstore.getFileSystem().mkdirs(new Path(newVersionPath));
+
+                    // If the user wants to run a incremental, skip version synchronization.
+                    if (args.incremental) {
+                        dstore.synchronizeInProgressVersion(newVersionPath);
                     }
-                    dstore.succeedVersion(_newVersionPath);
+
+                    dstore.succeedVersion(newVersionPath);
                 } else {
-                    dstore.failVersion(_newVersionPath);
+                    dstore.failVersion(newVersionPath);
                 }
             }
-        } catch(IOException e) {
+        } catch (IOException e) {
             throw new TapException("Couldn't finalize new elephant domain version", e);
         } finally {
-            _newVersionPath = null; //working around cascading calling sinkinit twice
+            newVersionPath = null; //working around cascading calling sinkinit twice
         }
     }
 
     public boolean onThrowable(Flow flow, Throwable t) {
         return false;
     }
-
-    @Override
-    public TupleEntryCollector openForWrite(JobConf conf) throws IOException {
-        return new TapCollector(this, conf);
-    }
-
-    @Override
-    public TupleEntryIterator openForRead(JobConf conf) throws IOException {
-        return new TupleEntryIterator(getSourceFields(), new TapIterator(this, conf));
-    }
-
-    @Override
-    public boolean equals(Object object) {
-        if(object instanceof ElephantDBTap) {
-            return _id == ((ElephantDBTap) object)._id;
-        } else {
-            return false;
-        }
-    }
-
-    @Override
-    public int hashCode() {
-        return new Integer(_id).hashCode();
-    }
-
-    private int _id;
-    private static int globalid = 0;
-
 }
