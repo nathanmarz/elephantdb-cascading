@@ -10,4 +10,4 @@
                      [hadoop-util "0.2.7"]
                      [jackknife "0.1.2"]
                      [org.apache.hadoop/hadoop-core "0.20.2-dev"]
-                     [midje "1.3.0" :exclusions [org.clojure/clojure]]])
+                     [midje "1.3.0"]])
