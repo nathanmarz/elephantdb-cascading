@@ -18,6 +18,10 @@
             ElephantDBTap$Args KeyValTailAssembly KeyValGateway]
            [org.apache.hadoop.mapred JobConf]))
 
+;; ## Global Vars
+
+(def ^:dynamic *default-conf* {})
+
 ;; ## Key-Value
 
 (defn kv-spec
@@ -64,27 +68,32 @@
 (defn job-conf
   "Returns a JobConf instance, optionally augmented by the supplied
    property map."
-  ([] (job-conf {}))
-  ([prop-map]
-     (let [conf (JobConf.)]
-       (doseq [[k v] (mk-props prop-map)]
-         (.set conf k v))
-       conf)))
+  [& [prop-map]]
+  (let [conf (JobConf.)]
+    (doseq [[k v] (mk-props (or prop-map *default-conf*))]
+      (.set conf k v))
+    conf))
 
 (defn flow-connector
   "Returns an instance of FlowConnection, optionally augmented by the
    supplied property map."
-  ([] (flow-connector {}))
-  ([prop-map]
-     (FlowConnector. (mk-props prop-map))))
+  [& [prop-map]]
+  (FlowConnector. (mk-props (or prop-map *default-conf*))))
 
 (defn conj-serialization!
-  "Appends the supplied serialization to the supplied JobConf
-  object. Returns the modified JobConf object."
-  [conf serialization]
-  (let [old-val (.get conf "io.serializations")
-        new-val (str old-val "," serialization)]
-    (.set conf "io.serializations" new-val)))
+  "Appends the supplied serialization to the supplied configuration
+  map. object. Returns the modified JobConf object."
+  [conf-map serialization]
+  (merge-with #(str %1 "," %2)
+              conf-map
+              {"io.serializations"  serialization}))
+
+(let [conf {"io.serializations" "StringWrapper"}]
+  (fact
+    (conj-serialization! {} "CakeWrapper") => {"io.serializations" "CakeWrapper"}
+    "Serializations should join up with commas."
+    (conj-serialization! conf "CakeWrapper") => {"io.serializations"
+                                                 "StringWrapper,CakeWrapper"}))
 
 (defn elephant-tap
   "Returns an ElephantDB Tap tuned to the supplied path and
@@ -97,8 +106,8 @@
 
 (defn connect!
   "Connect the supplied source and sink with the supplied pipe."
-  [pipe source sink & {:keys [props]}]
-  (doto (.connect (flow-connector props) source sink pipe)
+  [pipe source sink]
+  (doto (.connect (flow-connector) source sink pipe)
     (.complete)))
 
 (defn tuple-seq
@@ -133,8 +142,8 @@
   optional JobConf instance, supplied with the :conf keyword argument)
   and sinks all key-value pairs into the tap. Returns the original tap
   instance.."
-  [kv-tap kv-pairs & {:keys [props]}]
-  (with-open [collector (.openForWrite kv-tap (job-conf props))]
+  [kv-tap kv-pairs]
+  (with-open [collector (.openForWrite kv-tap (job-conf))]
     (doseq [[k v] kv-pairs]
       (.add collector (Tuple. (into-array Object [k v])))))
   kv-tap)
@@ -150,7 +159,8 @@
 
 (defn produces
   "Returns a chatty checker that tests for equality between two
-  sequences of tuples."
+  sequences of tuples. Accepts an optional property map as the second
+  parameter."
   [expected]
   (chatty-checker [actual]
                   (= (set expected)
@@ -164,13 +174,19 @@
   `with-kv-tap` accepts a `:log-level` optional keyword argument that
   can be used to tune the output of all jobs run within the
   form. Valid log level values or `:fatal`, `:warn`, `:info`, `:debug`
-  and `:off`."
+  and `:off`.
+
+  To change the configuration map used for the test, supply a map
+  using the `:conf` keyword argument."
   [[sym shard-count & opts] & body]
-  (let [log-level (:log-level (apply hash-map opts) :off)]
-    `(log/with-log-level ~log-level
-       (test/with-fs-tmp [fs# tmp#]
-         (let [~sym (elephant-tap tmp# ~shard-count ~@opts)]
-           ~@body)))))
+  (let [opt-map   (apply hash-map opts)
+        log-level (:log-level opt-map :off)
+        conf      (:conf opt-map *default-conf*)]
+    `(binding [*default-conf* (or ~conf)]
+       (log/with-log-level ~log-level
+         (test/with-fs-tmp [fs# tmp#]
+           (let [~sym (elephant-tap tmp# ~shard-count ~@opts)]
+             ~@body))))))
 
 ;; ## Tests
 
