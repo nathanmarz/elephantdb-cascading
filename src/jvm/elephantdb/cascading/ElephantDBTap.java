@@ -37,7 +37,7 @@ public class ElephantDBTap extends Hfs implements FlowListener {
         public Gateway gateway = new IdentityGateway();
 
         //source specific
-        public Fields sourceFields = new Fields("key", "value");
+        public Fields sourceFields = Fields.ALL;
         public Long version = null; //for sourcing
 
         //sink specific
