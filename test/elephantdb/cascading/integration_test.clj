@@ -145,11 +145,11 @@
   optional JobConf instance, supplied with the :conf keyword argument)
   and sinks all key-value pairs into the tap. Returns the original tap
   instance.."
-  [kv-tap kv-pairs]
+  [kv-tap tuples]
   (with-open [collector (-> (HadoopFlowProcess. (job-conf))
                             (.openTapForWrite kv-tap))]
-    (doseq [[k v] kv-pairs]
-      (.add collector (Tuple. (into-array Object [k v])))))
+    (doseq [tuple tuples]
+      (.add collector (Tuple. (into-array Object tuple)))))
   kv-tap)
 
 (defn populate-edb!
@@ -186,7 +186,7 @@
   (let [opt-map   (apply hash-map opts)
         log-level (:log-level opt-map :off)
         conf      (:conf opt-map *default-conf*)]
-    `(binding [*default-conf* (or ~conf)]
+    `(binding [*default-conf* (or ~conf {})]
        (log/with-log-level ~log-level
          (test/with-fs-tmp [fs# tmp#]
            (let [~sym (elephant-tap tmp# ~shard-count ~@opts)]
