@@ -8,6 +8,6 @@ To use elephantdb-cascading with EDB 0.2.0 and Cascading 1.2, use the following:
 
 To use Cascading 2.0, use the following: 
 
-    [elephantdb/elephantdb-cascalog "0.3.0"]
+    [elephantdb/elephantdb-cascalog "0.3.1"]
 
 See tests for usage examples.
