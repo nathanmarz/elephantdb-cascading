@@ -3,7 +3,7 @@
   :java-source-path "src/jvm"
   :javac-options {:debug "true" :fork "true"}
   :repositories {"conjars" "http://conjars.org/repo"}
-  :dependencies [[elephantdb "0.2.0-wip2"]
+  :dependencies [[elephantdb "0.2.0-wip3"]
                  [org.slf4j/slf4j-api "1.6.1"]
                  [cascading/cascading-hadoop "2.0.0-wip-281"
                   :exclusions [org.codehaus.janino/janino
