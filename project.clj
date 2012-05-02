@@ -1,4 +1,4 @@
-(defproject elephantdb/elephantdb-cascading "0.3.2-SNAPSHOT"
+(defproject elephantdb/elephantdb-cascading "0.3.2"
   :source-path "src/clj"
   :java-source-path "src/jvm"
   :javac-options {:debug "true" :fork "true"}
