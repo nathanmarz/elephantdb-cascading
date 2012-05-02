@@ -43,7 +43,7 @@ public class ElephantDBTap extends Hfs implements FlowListener {
         //sink specific
         public Fields sinkFields = Fields.ALL;
         public Indexer indexer = new IdentityIndexer();
-        public boolean incremental = false; //for sourcing
+        public boolean incremental = false;
     }
 
     String domainDir;
@@ -100,8 +100,8 @@ public class ElephantDBTap extends Hfs implements FlowListener {
         // serialize this particular argument off into the JobConf.
         Utils.setObject(conf, ElephantOutputFormat.ARGS_CONF, args);
         conf.setInt("mapred.task.timeout", this.args.timeoutMs);
-        conf.setBoolean("mapred.reduce.tasks.speculative.execution", false);
-        conf.setInt("mapred.reduce.tasks", spec.getNumShards());
+        conf.setNumReduceTasks(spec.getNumShards());
+        conf.setSpeculativeExecution(false);
     }
 
     public ElephantOutputFormat.Args outputArgs(JobConf conf) throws IOException {
