@@ -2,7 +2,7 @@ package elephantdb.cascading;
 
 import cascading.flow.Flow;
 import cascading.flow.FlowListener;
-import cascading.flow.hadoop.HadoopFlowProcess;
+import cascading.flow.FlowProcess;
 import cascading.tap.Tap;
 import cascading.tap.TapException;
 import cascading.tap.hadoop.Hfs;
@@ -27,7 +27,7 @@ import java.util.Map.Entry;
 import java.util.UUID;
 
 
-public class ElephantDBTap extends Hfs implements FlowListener {
+public class ElephantDBTap extends Hfs {
     public static final Logger LOG = Logger.getLogger(ElephantDBTap.class);
 
     public static class Args implements Serializable {
@@ -69,7 +69,7 @@ public class ElephantDBTap extends Hfs implements FlowListener {
         return spec;
     }
 
-    @Override public void sourceConfInit(HadoopFlowProcess process, JobConf conf) {
+    @Override public void sourceConfInit(FlowProcess<JobConf> process, JobConf conf) {
         super.sourceConfInit( process, conf );
 
         FileInputFormat.setInputPaths(conf, "/" + UUID.randomUUID().toString());
@@ -87,7 +87,7 @@ public class ElephantDBTap extends Hfs implements FlowListener {
         Utils.setObject(conf, ElephantInputFormat.ARGS_CONF, eargs);
     }
 
-    @Override public void sinkConfInit(HadoopFlowProcess process, JobConf conf) {
+    @Override public void sinkConfInit(FlowProcess<JobConf> process, JobConf conf) {
         super.sinkConfInit( process, conf );
 
         ElephantOutputFormat.Args args = null;
@@ -147,48 +147,31 @@ public class ElephantDBTap extends Hfs implements FlowListener {
         return System.currentTimeMillis();
     }
 
-    public void onStarting(Flow flow) {
-
-    }
-
-    public void onStopping(Flow flow) {
-
-    }
-
-    private boolean isSinkOf(Flow<JobConf> flow) {
-        for (Entry<String, Tap> e : flow.getSinks().entrySet()) {
-            if (e.getValue() == this)
-                return true;
-        }
-        return false;
-    }
-
-    public void onCompleted(Flow flow) {
+    @Override public boolean commitResource(JobConf conf) {
         try {
-            if (isSinkOf(flow)) {
-                DomainStore dstore = getDomainStore();
-                if (flow.getFlowStats().isSuccessful()) {
-                    dstore.getFileSystem().mkdirs(new Path(newVersionPath));
-
-                    // If the user wants to run a incremental, skip version synchronization.
-                    if (args.incremental) {
-                        dstore.synchronizeInProgressVersion(newVersionPath);
-                    }
-
-                    dstore.succeedVersion(newVersionPath);
-                } else {
-                    dstore.failVersion(newVersionPath);
-                }
+            DomainStore dstore = getDomainStore();
+            dstore.getFileSystem().mkdirs(new Path(newVersionPath));
+            
+            // If the user wants to run a incremental, skip version synchronization.
+            if (args.incremental) {
+                dstore.synchronizeInProgressVersion(newVersionPath);
             }
+            
+            dstore.succeedVersion(newVersionPath);
+            
+            return true;
+
         } catch (IOException e) {
             throw new TapException("Couldn't finalize new elephant domain version", e);
         } finally {
             newVersionPath = null; //working around cascading calling sinkinit twice
         }
     }
-
-    // TODO: Once failResource is implemented, move guts of onCompleted over to commitResource.
-    @Override public boolean commitResource(JobConf conf) {
+    
+    @Override public boolean rollbackResource(JobConf conf) throws IOException {
+        DomainStore dstore = getDomainStore();
+        dstore.failVersion(newVersionPath);        
+        
         return true;
     }
 
