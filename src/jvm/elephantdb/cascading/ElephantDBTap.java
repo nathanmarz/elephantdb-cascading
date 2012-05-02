@@ -2,9 +2,10 @@ package elephantdb.cascading;
 
 import cascading.flow.Flow;
 import cascading.flow.FlowListener;
-import cascading.tap.Hfs;
+import cascading.flow.FlowProcess;
 import cascading.tap.Tap;
 import cascading.tap.TapException;
+import cascading.tap.hadoop.Hfs;
 import cascading.tuple.Fields;
 import elephantdb.DomainSpec;
 import elephantdb.Utils;
@@ -25,7 +26,8 @@ import java.util.List;
 import java.util.Map.Entry;
 import java.util.UUID;
 
-public class ElephantDBTap extends Hfs implements FlowListener {
+
+public class ElephantDBTap extends Hfs {
     public static final Logger LOG = Logger.getLogger(ElephantDBTap.class);
 
     public static class Args implements Serializable {
@@ -41,7 +43,7 @@ public class ElephantDBTap extends Hfs implements FlowListener {
         //sink specific
         public Fields sinkFields = Fields.ALL;
         public Indexer indexer = new IdentityIndexer();
-        public boolean incremental = false; //for sourcing
+        public boolean incremental = false;
     }
 
     String domainDir;
@@ -67,9 +69,8 @@ public class ElephantDBTap extends Hfs implements FlowListener {
         return spec;
     }
 
-    @Override
-    public void sourceInit(JobConf conf) throws IOException {
-        super.sourceInit(conf);
+    @Override public void sourceConfInit(FlowProcess<JobConf> process, JobConf conf) {
+        super.sourceConfInit( process, conf );
 
         FileInputFormat.setInputPaths(conf, "/" + UUID.randomUUID().toString());
 
@@ -86,16 +87,21 @@ public class ElephantDBTap extends Hfs implements FlowListener {
         Utils.setObject(conf, ElephantInputFormat.ARGS_CONF, eargs);
     }
 
-    @Override public void sinkInit(JobConf conf) throws IOException {
-        super.sinkInit(conf);
+    @Override public void sinkConfInit(FlowProcess<JobConf> process, JobConf conf) {
+        super.sinkConfInit( process, conf );
 
-        ElephantOutputFormat.Args args = outputArgs(conf);
+        ElephantOutputFormat.Args args = null;
+        try {
+            args = outputArgs(conf);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
 
         // serialize this particular argument off into the JobConf.
         Utils.setObject(conf, ElephantOutputFormat.ARGS_CONF, args);
         conf.setInt("mapred.task.timeout", this.args.timeoutMs);
-        conf.setBoolean("mapred.reduce.tasks.speculative.execution", false);
-        conf.setInt("mapred.reduce.tasks", spec.getNumShards());
+        conf.setNumReduceTasks(spec.getNumShards());
+        conf.setSpeculativeExecution(false);
     }
 
     public ElephantOutputFormat.Args outputArgs(JobConf conf) throws IOException {
@@ -127,58 +133,46 @@ public class ElephantDBTap extends Hfs implements FlowListener {
     }
 
     @Override
-    public boolean makeDirs(JobConf jc) throws IOException {
+    public boolean createResource(JobConf jc) throws IOException {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 
     @Override
-    public boolean deletePath(JobConf jc) throws IOException {
+    public boolean deleteResource(JobConf jc) throws IOException {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 
     @Override
-    public long getPathModified(JobConf jc) throws IOException {
+    public long getModifiedTime(JobConf jc) throws IOException {
         return System.currentTimeMillis();
     }
 
-    public void onStarting(Flow flow) {
-
-    }
-
-    public void onStopping(Flow flow) {
-
-    }
-
-    private boolean isSinkOf(Flow flow) {
-        for (Entry<String, Tap> e : flow.getSinks().entrySet()) {
-            if (e.getValue() == this)
-                return true;
-        }
-        return false;
-    }
-
-    public void onCompleted(Flow flow) {
+    @Override public boolean commitResource(JobConf conf) {
         try {
-            if (isSinkOf(flow)) {
-                DomainStore dstore = getDomainStore();
-                if (flow.getFlowStats().isSuccessful()) {
-                    dstore.getFileSystem().mkdirs(new Path(newVersionPath));
-
-                    // If the user wants to run a incremental, skip version synchronization.
-                    if (args.incremental) {
-                        dstore.synchronizeInProgressVersion(newVersionPath);
-                    }
-
-                    dstore.succeedVersion(newVersionPath);
-                } else {
-                    dstore.failVersion(newVersionPath);
-                }
+            DomainStore dstore = getDomainStore();
+            dstore.getFileSystem().mkdirs(new Path(newVersionPath));
+            
+            // If the user wants to run a incremental, skip version synchronization.
+            if (args.incremental) {
+                dstore.synchronizeInProgressVersion(newVersionPath);
             }
+            
+            dstore.succeedVersion(newVersionPath);
+            
+            return true;
+
         } catch (IOException e) {
             throw new TapException("Couldn't finalize new elephant domain version", e);
         } finally {
             newVersionPath = null; //working around cascading calling sinkinit twice
         }
+    }
+    
+    @Override public boolean rollbackResource(JobConf conf) throws IOException {
+        DomainStore dstore = getDomainStore();
+        dstore.failVersion(newVersionPath);        
+        
+        return true;
     }
 
     public boolean onThrowable(Flow flow, Throwable t) {

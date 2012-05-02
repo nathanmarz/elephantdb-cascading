@@ -41,7 +41,6 @@ public class KeyValTailAssembly extends SubAssembly {
             Object key = call.getArguments().getObject(0);
 
             int shard = shardIndex(key);
-
             call.getOutputCollector().add(new Tuple(shard));
         }
     }

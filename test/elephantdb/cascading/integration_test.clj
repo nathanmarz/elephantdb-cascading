@@ -7,8 +7,10 @@
             [clojure.string :as s])
   (:import [cascading.pipe Pipe]
            [cascading.tuple Fields Tuple]
-           [cascading.flow FlowConnector]
-           [cascading.tap Hfs]
+           [cascading.flow.hadoop HadoopFlowProcess HadoopFlowConnector]
+           [cascading.tap.hadoop Hfs]
+           [elephantdb.persistence JavaBerkDB]
+           [elephantdb.document KeyValDocument]
            [elephantdb.partition HashModScheme]
            [elephantdb.persistence JavaBerkDB]
            [elephantdb DomainSpec]
@@ -78,7 +80,7 @@
   "Returns an instance of FlowConnection, optionally augmented by the
    supplied property map."
   [& [prop-map]]
-  (FlowConnector. (mk-props (or prop-map *default-conf*))))
+  (HadoopFlowConnector. (mk-props (or prop-map *default-conf*))))
 
 (defn conj-serialization!
   "Appends the supplied serialization to the supplied configuration
@@ -114,7 +116,8 @@
   "Returns all tuples in the supplied cascading tap as a Clojure
   sequence."
   [sink]
-  (with-open [it (.openForRead sink (job-conf))]
+  (with-open [it (-> (HadoopFlowProcess. (job-conf))
+                     (.openTapForRead sink))]
     (doall (for [wrapper (iterator-seq it)]
              (into [] (.getTuple wrapper))))))
 
@@ -142,10 +145,11 @@
   optional JobConf instance, supplied with the :conf keyword argument)
   and sinks all key-value pairs into the tap. Returns the original tap
   instance.."
-  [kv-tap kv-pairs]
-  (with-open [collector (.openForWrite kv-tap (job-conf))]
-    (doseq [[k v] kv-pairs]
-      (.add collector (Tuple. (into-array Object [k v])))))
+  [kv-tap tuples]
+  (with-open [collector (-> (HadoopFlowProcess. (job-conf))
+                            (.openTapForWrite kv-tap))]
+    (doseq [tuple tuples]
+      (.add collector (Tuple. (into-array Object tuple)))))
   kv-tap)
 
 (defn populate-edb!
@@ -182,7 +186,7 @@
   (let [opt-map   (apply hash-map opts)
         log-level (:log-level opt-map :off)
         conf      (:conf opt-map *default-conf*)]
-    `(binding [*default-conf* (or ~conf)]
+    `(binding [*default-conf* (or ~conf {})]
        (log/with-log-level ~log-level
          (test/with-fs-tmp [fs# tmp#]
            (let [~sym (elephant-tap tmp# ~shard-count ~@opts)]
