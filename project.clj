@@ -1,9 +1,9 @@
-(defproject elephantdb/elephantdb-cascading "0.3.3-SNAPSHOT"
+(defproject yieldbot/elephantdb-cascading "0.3.2"
   :source-path "src/clj"
   :java-source-path "src/jvm"
   :javac-options {:debug "true" :fork "true"}
   :repositories {"conjars" "http://conjars.org/repo"}
-  :dependencies [[elephantdb "0.2.0-wip3"]
+  :dependencies [[yieldbot/elephantdb "0.2.0-wip4"]
                  [org.slf4j/slf4j-api "1.6.1"]
                  [cascading/cascading-hadoop "2.0.0-wip-281"
                   :exclusions [org.codehaus.janino/janino
