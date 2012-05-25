@@ -16,6 +16,7 @@ import elephantdb.index.IdentityIndexer;
 import elephantdb.index.Indexer;
 import elephantdb.store.DomainStore;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.mapred.FileInputFormat;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.log4j.Logger;
@@ -106,9 +107,12 @@ public class ElephantDBTap extends Hfs {
 
     public ElephantOutputFormat.Args outputArgs(JobConf conf) throws IOException {
         DomainStore dstore = getDomainStore();
+        FileSystem fs = dstore.getFileSystem();
 
         if (newVersionPath == null) { //working around cascading calling sinkinit twice
             newVersionPath = dstore.createVersion();
+            // make the path qualified before serializing into the jobconf
+            newVersionPath = new Path(newVersionPath).makeQualified(fs).toString();
         }
         ElephantOutputFormat.Args eargs = new ElephantOutputFormat.Args(spec, newVersionPath);
 
