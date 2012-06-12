@@ -1,4 +1,4 @@
-(defproject yieldbot/elephantdb-cascading "0.3.3-SNAPSHOT"
+(defproject yieldbot/elephantdb-cascading "0.3.3"
   :source-path "src/clj"
   :java-source-path "src/jvm"
   :javac-options {:debug "true" :fork "true"}
