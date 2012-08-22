@@ -21,7 +21,7 @@ import org.apache.hadoop.mapred.RecordReader;
 
 import java.io.IOException;
 
-public class ElephantScheme extends Scheme<FlowProcess<JobConf>, JobConf, RecordReader, OutputCollector, Object[], Object[]> {
+public class ElephantScheme extends Scheme<JobConf, RecordReader, OutputCollector, Object[], Object[]> {
     Serializer serializer;
     Gateway gateway;
 
@@ -38,12 +38,12 @@ public class ElephantScheme extends Scheme<FlowProcess<JobConf>, JobConf, Record
 
     @Override
         public void sourceConfInit(FlowProcess<JobConf> flowProcess,
-                                   Tap<FlowProcess<JobConf>, JobConf, RecordReader, OutputCollector> tap, JobConf conf) {
+                                   Tap<JobConf, RecordReader, OutputCollector> tap, JobConf conf) {
         conf.setInputFormat(ElephantInputFormat.class);
     }
 
     @Override public void sinkConfInit(FlowProcess<JobConf> flowProcess,
-                                       Tap<FlowProcess<JobConf>, JobConf, RecordReader, OutputCollector> tap, JobConf conf) {
+                                       Tap<JobConf, RecordReader, OutputCollector> tap, JobConf conf) {
         conf.setOutputKeyClass(IntWritable.class); // be explicit
         conf.setOutputValueClass( BytesWritable.class ); // be explicit
         conf.setOutputFormat(ElephantOutputFormat.class);
