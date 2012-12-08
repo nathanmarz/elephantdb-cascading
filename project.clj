@@ -1,17 +1,23 @@
 (defproject yieldbot/elephantdb-cascading "0.3.5-SNAPSHOT"
-  :source-path "src/clj"
-  :java-source-path "src/jvm"
-  :javac-options {:debug "true" :fork "true"}
+  :min-lein-version "2.0.0"
+  :source-paths ["src/clj"]
+  :java-source-paths ["src/jvm"]
+  :javac-options ["-source" "1.6" "-target" "1.6"]
   :repositories {"conjars" "http://conjars.org/repo"}
   :dependencies [[yieldbot/elephantdb "0.2.0-SNAPSHOT"
                   :exclusions [org.apache.hadoop/hadoop-core]]
                  [org.slf4j/slf4j-api "1.6.1"]
-                 [cascading/cascading-hadoop "2.0.0"
-                  :exclusions [org.codehaus.janino/janino
-                               org.apache.hadoop/hadoop-core]]]
-  :dev-dependencies [[org.apache.hadoop/hadoop-core "0.20.2-dev"]
-                     [org.clojure/clojure "1.4.0"]
-                     [hadoop-util "0.2.8"]
-                     [jackknife "0.1.2"]
-                     [midje "1.3.1"
-                      :exclusions [org.clojure/clojure]]])
+                 [cascading/cascading-hadoop "2.1.0"
+                  :exclusions [org.apache.hadoop/hadoop-core]]]
+  :profiles {:provided
+             {:dependencies
+              [[org.apache.hadoop/hadoop-core "0.20.2-dev"]]}
+             :dev
+             {:dependencies
+              [[org.clojure/clojure "1.4.0"]
+               [hadoop-util "0.2.8"]
+               [jackknife "0.1.2"]
+               [midje "1.4.0"
+                :exclusions [org.clojure/clojure]]]}}
+  :plugins [[lein-midje "2.0.3"]])
+
