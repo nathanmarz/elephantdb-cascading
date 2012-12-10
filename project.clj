@@ -7,7 +7,7 @@
   :dependencies [[yieldbot/elephantdb "0.2.0-SNAPSHOT"
                   :exclusions [org.apache.hadoop/hadoop-core]]
                  [org.slf4j/slf4j-api "1.6.1"]
-                 [cascading/cascading-hadoop "2.0.6"
+                 [cascading/cascading-hadoop "2.1.0"
                   :exclusions [org.apache.hadoop/hadoop-core]]]
   :profiles {:provided
              {:dependencies

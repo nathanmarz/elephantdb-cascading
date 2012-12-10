@@ -140,7 +140,11 @@ public class ElephantDBTap extends Hfs {
     
     @Override
     public long getModifiedTime(JobConf conf) throws IOException {
-        return System.currentTimeMillis();
+        // return System.currentTimeMillis();
+        if (newVersionPath != null)
+            return 0;
+
+        return getDomainStore().mostRecentVersion();
     }
 
     @Override
