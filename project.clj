@@ -4,20 +4,19 @@
   :java-source-paths ["src/jvm"]
   :javac-options ["-source" "1.6" "-target" "1.6"]
   :repositories {"conjars" "http://conjars.org/repo"}
-  :dependencies [[yieldbot/elephantdb "0.2.0-SNAPSHOT"
-                  :exclusions [org.apache.hadoop/hadoop-core]]
-                 [org.slf4j/slf4j-api "1.6.1"]
-                 [cascading/cascading-hadoop "2.1.0"
+  :dependencies [[yieldbot/elephantdb "0.2.0-SNAPSHOT"]
+                 [cascading/cascading-hadoop "2.0.6"
                   :exclusions [org.apache.hadoop/hadoop-core]]]
   :profiles {:provided
              {:dependencies
-              [[org.apache.hadoop/hadoop-core "0.20.2-dev"]]}
+              [[org.apache.hadoop/hadoop-core "1.0.3"]]}
              :dev
              {:dependencies
               [[org.clojure/clojure "1.4.0"]
                [hadoop-util "0.2.8"]
                [jackknife "0.1.2"]
                [midje "1.4.0"
-                :exclusions [org.clojure/clojure]]]}}
-  :plugins [[lein-midje "2.0.3"]])
-
+                :exclusions [org.clojure/clojure]]]
+              :plugins [[lein-midje "2.0.3"]
+                        [lein-pedantic "0.0.5"]]}}
+  :pedantic :warn)
