@@ -17,6 +17,7 @@ import elephantdb.index.Indexer;
 import elephantdb.store.DomainStore;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.mapred.FileInputFormat;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.log4j.Logger;
@@ -123,6 +124,7 @@ public class ElephantDBTap extends Hfs {
         if (args.indexer != null)
             eargs.indexer = args.indexer;
 
+
         // If incremental is set to true, we go ahead and populate the
         // update Dir. Else, we leave it blank.
         if (args.incremental)
@@ -135,20 +137,24 @@ public class ElephantDBTap extends Hfs {
     public Path getPath() {
         return new Path(domainDir);
     }
+    
+    @Override
+    public long getModifiedTime(JobConf conf) throws IOException {
+        // return System.currentTimeMillis();
+        if (newVersionPath != null)
+            return 0;
+
+        return getDomainStore().mostRecentVersion();
+    }
 
     @Override
-    public boolean createResource(JobConf jc) throws IOException {
+    public boolean createResource(JobConf conf) throws IOException {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 
     @Override
-    public boolean deleteResource(JobConf jc) throws IOException {
+    public boolean deleteResource(JobConf conf) throws IOException {
         throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public long getModifiedTime(JobConf jc) throws IOException {
-        return System.currentTimeMillis();
     }
 
     @Override public boolean commitResource(JobConf conf) {
