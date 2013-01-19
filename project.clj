@@ -1,4 +1,4 @@
-(defproject yieldbot/elephantdb-cascading "0.3.5-SNAPSHOT"
+(defproject elephantdb/elephantdb-cascading "0.3.5-SNAPSHOT"
   :min-lein-version "2.0.0"
   :source-paths ["src/clj"]
   :java-source-paths ["src/jvm"]
@@ -10,7 +10,7 @@
                   :exclusions [org.apache.hadoop/hadoop-core]]]
   :profiles {:provided
              {:dependencies
-              [[org.apache.hadoop/hadoop-core "1.0.3"]]}
+              [[org.apache.hadoop/hadoop-core "0.20.2-dev"]]}
              :dev
              {:dependencies
               [[org.clojure/clojure "1.4.0"]
@@ -18,6 +18,4 @@
                [jackknife "0.1.2"]
                [midje "1.4.0"
                 :exclusions [org.clojure/clojure]]]
-              :plugins [[lein-midje "2.0.3"]
-                        [lein-pedantic "0.0.5"]]}}
-  :pedantic :warn)
+              :plugins [[lein-midje "2.0.3"]]}})
