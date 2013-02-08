@@ -5,7 +5,7 @@
   :javac-options ["-source" "1.6" "-target" "1.6"]
   :jvm-opts ["-server" "-Xmx768m"]
   :repositories {"conjars" "http://conjars.org/repo"}
-  :dependencies [[yieldbot/elephantdb "0.2.0-SNAPSHOT"]
+  :dependencies [[elephantdb "0.2.0"]
                  [cascading/cascading-hadoop "2.0.6"
                   :exclusions [org.apache.hadoop/hadoop-core]]]
   :profiles {:provided
@@ -14,8 +14,7 @@
              :dev
              {:dependencies
               [[org.clojure/clojure "1.4.0"]
-               [hadoop-util "0.2.8"]
+               [hadoop-util "0.2.9"]
                [jackknife "0.1.2"]
-               [midje "1.4.0"
-                :exclusions [org.clojure/clojure]]]
-              :plugins [[lein-midje "2.0.3"]]}})
+               [midje "1.5-alpha9"]]
+              :plugins [[lein-midje "3.0-alpha4"]]}})
