@@ -1,4 +1,4 @@
-(defproject elephantdb/elephantdb-cascading "0.3.5-SNAPSHOT"
+(defproject elephantdb/elephantdb-cascading "0.3.5"
   :min-lein-version "2.0.0"
   :source-paths ["src/clj"]
   :java-source-paths ["src/jvm"]
