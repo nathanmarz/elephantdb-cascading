@@ -1,3 +1,4 @@
+target
 elephantdb-cascading.jar
 classes
 lib
@@ -10,3 +11,4 @@ pom.xml
 *.ipr
 *.iws
 .DS_Store
+target

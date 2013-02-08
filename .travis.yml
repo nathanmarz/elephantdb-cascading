@@ -7,14 +7,9 @@ before_install: lein plugin install lein-multi 1.1.0 && lein plugin install lein
 script: lein compile, midje
 branches:
   only:
-    - feature/cascading2
     - develop
     - master
 notifications:
   email:
     - nathanmarz@gmail.com
     - sritchie09@gmail.com
-
-
-
-
