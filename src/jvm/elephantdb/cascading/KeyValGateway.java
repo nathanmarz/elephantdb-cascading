@@ -9,7 +9,7 @@ public class KeyValGateway implements Gateway<KeyValDocument> {
         Object key = tuple.getObject(1);
         Object val = tuple.getObject(2);
 
-        return new KeyValDocument<Object, Object>(key, val);
+        return new KeyValDocument((byte[])key, (byte[])val);
     }
 
     public Tuple toTuple(KeyValDocument document) {

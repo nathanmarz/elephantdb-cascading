@@ -14,7 +14,6 @@ import cascading.tuple.Tuple;
 import elephantdb.DomainSpec;
 import elephantdb.Utils;
 import elephantdb.partition.ShardingScheme;
-import elephantdb.serialize.Serializer;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.log4j.Logger;
 
@@ -33,29 +32,27 @@ public class KeyValTailAssembly extends SubAssembly {
             shardCount = spec.getNumShards();
         }
 
-        public int shardIndex(Object key) {
+        public int shardIndex(byte[] key) {
             return shardScheme.shardIndex(key, shardCount);
         }
 
         public void operate(FlowProcess process, FunctionCall call) {
             Object key = call.getArguments().getObject(0);
 
-            int shard = shardIndex(key);
+            int shard = shardIndex((byte[])key);
             call.getOutputCollector().add(new Tuple(shard));
         }
     }
 
     public static class MakeSortableKey extends BaseOperation implements Function {
-        Serializer serializer;
 
         public MakeSortableKey(String outfield, DomainSpec spec) {
             super(new Fields(outfield));
-            serializer = Utils.makeSerializer(spec);
         }
 
         public void operate(FlowProcess process, FunctionCall call) {
             Object key = call.getArguments().getObject(0);
-            BytesWritable sortField = new BytesWritable(serializer.serialize(key));
+            BytesWritable sortField = new BytesWritable((byte[])key);
             call.getOutputCollector().add(new Tuple(sortField));
         }
     }
