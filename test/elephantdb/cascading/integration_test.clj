@@ -247,34 +247,3 @@
         of tuples as merging two clojure maps"
         (populate-edb! sink data2)
         sink => (produces (merge data data2))))))
-
-(facts
-  "Explicitly set an indexer to customize the incremental update
-  behavior. This test checks that the StringAppendIndexer merges by
-  appending the new value onto the old value instead of knocking out
-  the old value completely."
-  (with-kv-tap [sink 2 :indexer (StringAppendIndexer.)]
-    (let [data   {0 "zero"
-                  1 "one"
-                  2 "two"}
-          data2  {0 "ZERO!"
-                  2 "TWO!"
-                  3 "THREE!"}
-          merged {0 "zeroZERO!"
-                  1 "one"
-                  2 "twoTWO!"
-                  3 "THREE!"}]
-      (fact "Populating the sink with `data` produces `data`."
-        (populate-edb! sink data)
-        sink => (produces data))
-      
-      (fact "Sinking `data2` on top of `data` causes clashing values
-        to merge with a string-append."
-        (populate-edb! sink data2)
-        sink => (produces merged)
-
-        "Note that `merged` can be created with clojure's `merge-with`."
-        (merge-with str data data2) => merged))))
-
-(future-fact
- "Test of support for multiple types of serialization.")

@@ -9,10 +9,10 @@ import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
 import elephantdb.DomainSpec;
 import elephantdb.Utils;
+import elephantdb.document.KeyValDocument;
 import elephantdb.hadoop.ElephantInputFormat;
 import elephantdb.hadoop.ElephantOutputFormat;
-import elephantdb.serialize.Serializer;
-import org.apache.hadoop.io.BytesWritable;
+import elephantdb.hadoop.ElephantRecordWritable;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapred.JobConf;
@@ -22,18 +22,12 @@ import org.apache.hadoop.mapred.RecordReader;
 import java.io.IOException;
 
 public class ElephantScheme extends Scheme<JobConf, RecordReader, OutputCollector, Object[], Object[]> {
-    Serializer serializer;
     Gateway gateway;
 
     public ElephantScheme(Fields sourceFields, Fields sinkFields, DomainSpec spec, Gateway gateway) {
         setSourceFields(sourceFields);
         setSinkFields(sinkFields);
-        this.serializer = Utils.makeSerializer(spec);
         this.gateway = gateway;
-    }
-
-    public Serializer getSerializer() {
-        return serializer;
     }
 
     @Override
@@ -45,7 +39,7 @@ public class ElephantScheme extends Scheme<JobConf, RecordReader, OutputCollecto
     @Override public void sinkConfInit(FlowProcess<JobConf> flowProcess,
                                        Tap<JobConf, RecordReader, OutputCollector> tap, JobConf conf) {
         conf.setOutputKeyClass(IntWritable.class); // be explicit
-        conf.setOutputValueClass( BytesWritable.class ); // be explicit
+        conf.setOutputValueClass(ElephantRecordWritable.class); // be explicit
         conf.setOutputFormat(ElephantOutputFormat.class);
     }
 
@@ -62,15 +56,14 @@ public class ElephantScheme extends Scheme<JobConf, RecordReader, OutputCollecto
         SourceCall<Object[], RecordReader> sourceCall) throws IOException {
 
         NullWritable key = (NullWritable) sourceCall.getContext()[0];
-        BytesWritable value = (BytesWritable) sourceCall.getContext()[1];
+        ElephantRecordWritable value = (ElephantRecordWritable) sourceCall.getContext()[1];
 
         boolean result = sourceCall.getInput().next(key, value);
 
         if (!result)
             return false;
 
-        byte[] valBytes = Utils.getBytes(value);
-        Object doc = getSerializer().deserialize(valBytes);
+        Object doc = new KeyValDocument(value.key, value.value);
 
         sourceCall.getIncomingEntry().setTuple(gateway.toTuple(doc));
         return true;
@@ -80,11 +73,9 @@ public class ElephantScheme extends Scheme<JobConf, RecordReader, OutputCollecto
         SinkCall<Object[], OutputCollector> sinkCall) throws IOException {
         Tuple tuple = sinkCall.getOutgoingEntry().getTuple();
 
-
         int shard = tuple.getInteger(0);
         Object doc = gateway.fromTuple(tuple);
 
-        byte[] crushedDocument = getSerializer().serialize(doc);
-        sinkCall.getOutput().collect(new IntWritable(shard), new BytesWritable(crushedDocument));
+        sinkCall.getOutput().collect(new IntWritable(shard), new ElephantRecordWritable(((KeyValDocument)doc).key, ((KeyValDocument)doc).value));
     }
 }
