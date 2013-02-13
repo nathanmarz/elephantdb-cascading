@@ -36,7 +36,7 @@ public class ElephantDBTap extends Hfs {
         //for source and sink
         public List<String> tmpDirs = null;
         public int timeoutMs = 2 * 60 * 60 * 1000; // 2 hours
-        public Gateway gateway = new IdentityGateway();
+        public KeyValGateway gateway = new KeyValGateway();
 
         //source specific
         public Fields sourceFields = Fields.ALL;

@@ -22,9 +22,9 @@ import org.apache.hadoop.mapred.RecordReader;
 import java.io.IOException;
 
 public class ElephantScheme extends Scheme<JobConf, RecordReader, OutputCollector, Object[], Object[]> {
-    Gateway gateway;
+    KeyValGateway gateway;
 
-    public ElephantScheme(Fields sourceFields, Fields sinkFields, DomainSpec spec, Gateway gateway) {
+    public ElephantScheme(Fields sourceFields, Fields sinkFields, DomainSpec spec, KeyValGateway gateway) {
         setSourceFields(sourceFields);
         setSinkFields(sinkFields);
         this.gateway = gateway;
@@ -63,7 +63,7 @@ public class ElephantScheme extends Scheme<JobConf, RecordReader, OutputCollecto
         if (!result)
             return false;
 
-        Object doc = new KeyValDocument(value.key, value.value);
+        KeyValDocument doc = new KeyValDocument(value.key, value.value);
 
         sourceCall.getIncomingEntry().setTuple(gateway.toTuple(doc));
         return true;
@@ -74,8 +74,8 @@ public class ElephantScheme extends Scheme<JobConf, RecordReader, OutputCollecto
         Tuple tuple = sinkCall.getOutgoingEntry().getTuple();
 
         int shard = tuple.getInteger(0);
-        Object doc = gateway.fromTuple(tuple);
+        KeyValDocument doc = gateway.fromTuple(tuple);
 
-        sinkCall.getOutput().collect(new IntWritable(shard), new ElephantRecordWritable(((KeyValDocument)doc).key, ((KeyValDocument)doc).value));
+        sinkCall.getOutput().collect(new IntWritable(shard), new ElephantRecordWritable(doc.key, doc.value));
     }
 }

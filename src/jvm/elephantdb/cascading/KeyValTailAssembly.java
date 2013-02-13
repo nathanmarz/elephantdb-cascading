@@ -51,8 +51,9 @@ public class KeyValTailAssembly extends SubAssembly {
         }
 
         public void operate(FlowProcess process, FunctionCall call) {
-            Object key = call.getArguments().getObject(0);
-            BytesWritable sortField = new BytesWritable((byte[])key);
+            Object f1 = call.getArguments().getObject(0);
+            byte[] key = (byte[]) f1;
+            BytesWritable sortField = new BytesWritable(key);
             call.getOutputCollector().add(new Tuple(sortField));
         }
     }

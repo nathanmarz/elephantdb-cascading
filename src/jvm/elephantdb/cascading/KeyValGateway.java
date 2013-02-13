@@ -6,10 +6,13 @@ import elephantdb.document.KeyValDocument;
 /** User: sritchie Date: 12/16/11 Time: 12:08 AM */
 public class KeyValGateway implements Gateway<KeyValDocument> {
     public KeyValDocument fromTuple(Tuple tuple) {
-        Object key = tuple.getObject(1);
-        Object val = tuple.getObject(2);
+        Object f1 = tuple.getObject(1);
+        Object f2 = tuple.getObject(2);
+        
+        byte[] key = (byte[]) f1;
+        byte[] val = (byte[]) f2;
 
-        return new KeyValDocument((byte[])key, (byte[])val);
+        return new KeyValDocument(key, val);
     }
 
     public Tuple toTuple(KeyValDocument document) {
