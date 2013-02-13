@@ -7,7 +7,8 @@
   :repositories {"conjars" "http://conjars.org/repo"}
   :dependencies [[elephantdb "0.2.1-SNAPSHOT"]
                  [cascading/cascading-hadoop "2.0.6"
-                  :exclusions [org.apache.hadoop/hadoop-core]]]
+                  :exclusions [org.codehaus.janino/janino
+                               org.apache.hadoop/hadoop-core]]]
   :profiles {:provided
              {:dependencies
               [[org.apache.hadoop/hadoop-core "0.20.2-dev"]]}
