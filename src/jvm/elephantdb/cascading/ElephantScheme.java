@@ -24,7 +24,7 @@ import java.io.IOException;
 public class ElephantScheme extends Scheme<JobConf, RecordReader, OutputCollector, Object[], Object[]> {
     Gateway gateway;
 
-    public ElephantScheme(Fields sourceFields, Fields sinkFields, DomainSpec spec, KeyValGateway gateway) {
+    public ElephantScheme(Fields sourceFields, Fields sinkFields, DomainSpec spec, Gateway gateway) {
         setSourceFields(sourceFields);
         setSinkFields(sinkFields);
         this.gateway = gateway;
