@@ -30,9 +30,8 @@ public class ElephantScheme extends Scheme<JobConf, RecordReader, OutputCollecto
         this.gateway = gateway;
     }
 
-    @Override
-        public void sourceConfInit(FlowProcess<JobConf> flowProcess,
-                                   Tap<JobConf, RecordReader, OutputCollector> tap, JobConf conf) {
+    @Override public void sourceConfInit(FlowProcess<JobConf> flowProcess,
+                                         Tap<JobConf, RecordReader, OutputCollector> tap, JobConf conf) {
         conf.setInputFormat(ElephantInputFormat.class);
     }
 
